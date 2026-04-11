@@ -3,7 +3,7 @@ Tampa PowerIQ — Backend API
 Run: uvicorn main:app --reload
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -13,6 +13,10 @@ import os
 
 from backend.upload import router as upload_router, get_session_summaries, get_uploaded_dataframes
 from backend.map_data import build_geojson
+from backend.zones import (
+    load_zones_geojson, load_config, list_zone_names,
+    ingest_zones_geojson, reset_to_default
+)
 from backend.agent import ask_agent, build_roadmap
 from backend.scoring import score_projects
 
@@ -36,6 +40,50 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 @app.get("/")
 def serve_ui():
     return FileResponse("static/index.html")
+
+
+# ---------------------------------------------------------------------------
+# Zones — city-agnostic neighborhood GeoJSON
+# ---------------------------------------------------------------------------
+
+@app.get("/api/zones/geojson")
+def get_zones_geojson():
+    """Return the active zone GeoJSON (uploaded or Tampa default)."""
+    return load_zones_geojson()
+
+
+@app.get("/api/zones/config")
+def get_zones_config():
+    """Return which GeoJSON is active and what field holds zone names."""
+    cfg = load_config()
+    cfg["zone_names"] = list_zone_names()
+    return cfg
+
+
+class ZonesUpload(BaseModel):
+    name_field:  str   # property field in the GeoJSON that holds the zone name
+    city_label:  str   # human label e.g. "Orlando, FL"
+
+
+@app.post("/api/zones/upload")
+async def upload_zones_geojson(
+    file: UploadFile = File(...),
+    name_field: str = Form("NAME"),
+    city_label: str = Form("My City"),
+):
+    raw = await file.read()
+    try:
+        summary = ingest_zones_geojson(raw, name_field, city_label)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return summary
+
+
+@app.post("/api/zones/reset")
+def reset_zones():
+    """Revert to the built-in Tampa GeoJSON."""
+    reset_to_default()
+    return {"message": "Reset to Tampa default"}
 
 
 # ---------------------------------------------------------------------------

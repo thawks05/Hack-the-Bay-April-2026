@@ -33,6 +33,16 @@ NUMERIC_COLS = [
     "loss_mw",
     "peak_load_mw",
     "avg_load_mw",
+    "outage_duration",
+    "allocation_pct",    # 0.0–1.0 share of output attributed to this zone
+]
+
+# Columns passed through as-is (string/text)
+PASSTHROUGH_COLS = [
+    "outage_risk",       # e.g. low / medium / high
+    "last_outage_date",  # date string
+    "notes",
+    "zone_id",           # exact AssocLabel from Tampa neighborhoods GeoJSON
 ]
 
 FileType = Literal["utility", "timeseries", "event"]
@@ -94,11 +104,26 @@ def parse_and_clean(raw_bytes: bytes, filename: str, file_type_hint: str | None 
     df["lat"] = df["lat"].astype(float)
     df["lon"] = df["lon"].astype(float)
 
+    # Default allocation_pct to 1.0 if missing
+    if "allocation_pct" not in df.columns:
+        df["allocation_pct"] = 1.0
+    else:
+        df["allocation_pct"] = df["allocation_pct"].fillna(1.0).clip(0, 1)
+
+    # If zone_id missing, copy from zone column (backwards compat)
+    if "zone_id" not in df.columns and "zone" in df.columns:
+        df["zone_id"] = df["zone"]
+
     # Parse timestamp if present
     if "timestamp" in df.columns:
         df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
 
     file_type = detect_file_type(df, file_type_hint)
+
+    # Count high-risk outage facilities if column present
+    high_risk_count = None
+    if "outage_risk" in df.columns:
+        high_risk_count = int((df["outage_risk"].str.lower() == "high").sum())
 
     summary = {
         "rows": len(df),
@@ -107,6 +132,7 @@ def parse_and_clean(raw_bytes: bytes, filename: str, file_type_hint: str | None 
         "source_types": df["source_type"].dropna().unique().tolist() if "source_type" in df.columns else [],
         "total_generation_mw": round(df["generation_mw"].sum(), 2) if "generation_mw" in df.columns else None,
         "total_consumption_mw": round(df["consumption_mw"].sum(), 2) if "consumption_mw" in df.columns else None,
+        "high_outage_risk_facilities": high_risk_count,
         "warnings": warnings,
     }
 

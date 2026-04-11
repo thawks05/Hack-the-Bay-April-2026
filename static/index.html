@@ -140,6 +140,16 @@
           <option value="event">Event file (Gasparilla, etc.)</option>
         </select>
       </div>
+
+      <div style="margin-top:14px;border-top:1px solid #1e3a5f;padding-top:14px">
+        <div style="font-size:0.72rem;color:#64748b;margin-bottom:8px">Zone boundaries (any city)</div>
+        <label class="file-input-label" for="geoFile">🗺 Upload neighborhood GeoJSON…</label>
+        <input type="file" id="geoFile" accept=".geojson,.json" onchange="uploadZoneGeoJSON(this)" />
+        <input id="nameFieldInput" placeholder="Zone name field (e.g. NAME, district)" style="width:100%;padding:7px 10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:0.8rem;margin-bottom:6px" />
+        <input id="cityLabelInput" placeholder="City label (e.g. Orlando, FL)" style="width:100%;padding:7px 10px;background:#1e293b;border:1px solid #334155;border-radius:6px;color:#e2e8f0;font-size:0.8rem;margin-bottom:6px" />
+        <button class="btn-primary" style="font-size:0.78rem;padding:7px" onclick="submitZoneGeoJSON()">Upload zone boundaries</button>
+        <div id="geoStatus" class="upload-status" style="margin-top:6px">Using Tampa, FL default</div>
+      </div>
     </div>
 
     <!-- Zone summary -->
@@ -184,15 +194,18 @@
 
 <script>
   const API = 'http://localhost:8000/api';
-  let map, markersLayer;
+  let map, zonesLayer, flowsLayer, pinsLayer;
 
   // ── Init map ──────────────────────────────────────────────────
   function initMap() {
-    map = L.map('map', { zoomControl: true }).setView([27.9477, -82.4589], 12);
+    map = L.map('map', { zoomControl: true }).setView([27.9477, -82.4589], 11);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '© OpenStreetMap © CARTO', maxZoom: 19
     }).addTo(map);
-    markersLayer = L.layerGroup().addTo(map);
+    // Layer order: zones (bottom) → flows → pins (top)
+    zonesLayer = L.layerGroup().addTo(map);
+    flowsLayer = L.layerGroup().addTo(map);
+    pinsLayer  = L.layerGroup().addTo(map);
   }
 
   // ── Health check ──────────────────────────────────────────────
@@ -272,42 +285,165 @@
     }
   }
 
+  // ── Zone GeoJSON upload ───────────────────────────────────────
+  let _pendingGeoFile = null;
+  function uploadZoneGeoJSON(input) {
+    _pendingGeoFile = input.files[0] || null;
+    document.getElementById('geoStatus').textContent = _pendingGeoFile
+      ? `Ready to upload: ${_pendingGeoFile.name}`
+      : '';
+  }
+
+  async function submitZoneGeoJSON() {
+    if (!_pendingGeoFile) return;
+    const nameField = document.getElementById('nameFieldInput').value.trim() || 'NAME';
+    const cityLabel = document.getElementById('cityLabelInput').value.trim() || 'My City';
+    const status    = document.getElementById('geoStatus');
+    status.className = 'upload-status';
+    status.textContent = 'Uploading…';
+
+    const form = new FormData();
+    form.append('file', _pendingGeoFile);
+    form.append('name_field', nameField);
+    form.append('city_label', cityLabel);
+
+    try {
+      const r = await fetch(`${API}/zones/upload`, { method: 'POST', body: form });
+      const d = await r.json();
+      if (!r.ok) throw new Error(d.detail || 'Upload failed');
+      status.className = 'upload-status ok';
+      status.textContent = `✓ ${d.feature_count} zones loaded for ${cityLabel} (field: "${nameField}")`;
+      await refreshMap();
+    } catch (e) {
+      status.className = 'upload-status err';
+      status.textContent = `✗ ${e.message}`;
+    }
+  }
+
   // ── Refresh map ───────────────────────────────────────────────
   async function refreshMap() {
     try {
-      const d = await fetch(`${API}/map`).then(r => r.json());
-      markersLayer.clearLayers();
+      // Fetch data layer and real Tampa neighborhood GeoJSON in parallel
+      const [mapRes, zonesRes] = await Promise.all([
+        fetch(`${API}/map`),
+        fetch(`${API}/zones/geojson`),
+      ]);
+      if (!mapRes.ok) { console.error('Map API error', mapRes.status); return; }
 
-      // Draw pins
-      d.pins.features.forEach(f => {
-        const [lon, lat] = f.geometry.coordinates;
-        const p = f.properties;
-        const circle = L.circleMarker([lat, lon], {
-          radius: p.radius,
-          fillColor: p.color,
-          color: '#fff',
-          weight: 1,
-          fillOpacity: 0.85,
-        });
-        circle.bindPopup(`
-          <b>${p.facility_name}</b><br/>
-          Type: ${p.source_type}<br/>
-          Zone: ${p.zone}<br/>
-          Generation: ${p.generation_mw ?? 0} MW<br/>
-          Consumption: ${p.consumption_mw ?? 0} MW
-        `);
-        markersLayer.addLayer(circle);
+      const d        = await mapRes.json();
+      const tampaGeo = await zonesRes.json();
+
+      zonesLayer.clearLayers();
+      flowsLayer.clearLayers();
+      pinsLayer.clearLayers();
+
+      // Fetch which GeoJSON property holds the zone name (set during onboarding)
+      const cfg = await fetch(`${API}/zones/config`).then(r => r.json()).catch(() => ({ name_field: 'AssocLabel' }));
+      const NAME_FIELD = cfg.name_field || 'AssocLabel';
+
+      // Build lookup: zone name → zone stats from uploaded data
+      const statsByZone = {};
+      (d.zone_stats || []).forEach(s => { statsByZone[s.zone_id] = s; });
+
+      // Helper: net flow → fill colour + opacity
+      function zoneStyle(net) {
+        if (net === undefined) return { fill: '#1e293b', opacity: 0.2, stroke: '#334155' };
+        if (net > 50)  return { fill: '#166534', opacity: 0.55, stroke: '#22c55e' };
+        if (net > 10)  return { fill: '#15803d', opacity: 0.40, stroke: '#4ade80' };
+        if (net >= -10) return { fill: '#1e3a5f', opacity: 0.30, stroke: '#60a5fa' };
+        if (net >= -50) return { fill: '#991b1b', opacity: 0.40, stroke: '#f87171' };
+        return           { fill: '#7f1d1d', opacity: 0.55, stroke: '#fca5a5' };
+      }
+
+      // 1. Real Tampa neighborhood polygons (bottom layer)
+      L.geoJSON(tampaGeo, {
+        style: feat => {
+          const name  = feat.properties?.[NAME_FIELD] || '';
+          const stats = statsByZone[name];
+          const c     = zoneStyle(stats?.net_flow_mw);
+          return { fillColor: c.fill, fillOpacity: c.opacity, color: c.stroke, weight: 1, opacity: 0.7 };
+        },
+        onEachFeature: (feat, layer) => {
+          const name  = feat.properties?.[NAME_FIELD] || 'Unknown';
+          const stats = statsByZone[name];
+          if (stats) {
+            const c = zoneStyle(stats.net_flow_mw);
+            layer.bindPopup(`
+              <div style="font-family:system-ui;min-width:200px">
+                <b>${name}</b>
+                <div style="margin-top:5px;font-size:0.82rem">
+                  Status: <b style="color:${c.stroke}">${stats.status.toUpperCase()}</b><br/>
+                  Net flow: <b>${stats.net_flow_mw >= 0 ? '+' : ''}${stats.net_flow_mw} MW</b><br/>
+                  Generation: ${stats.generation_mw} MW<br/>
+                  Consumption: ${stats.consumption_mw} MW<br/>
+                  Facilities: ${stats.facility_count}
+                </div>
+              </div>
+            `);
+          } else {
+            layer.bindTooltip(name, { sticky: true });
+          }
+        }
+      }).addTo(zonesLayer);
+
+      // 2. Flow lines (middle layer)
+      d.flows.features.forEach(f => {
+        const p     = f.properties;
+        const coords = f.geometry.coordinates.map(([lon, lat]) => [lat, lon]);
+        L.polyline(coords, { color: '#60a5fa', weight: p.weight || 1, opacity: 0.45, dashArray: '5 7' })
+          .bindTooltip(`${p.from} → ${p.to}  ${p.flow_mw} MW`, { sticky: true })
+          .addTo(flowsLayer);
       });
 
-      // Zone list
-      const zl = document.getElementById('zoneList');
-      if (d.zones.length === 0) return;
-      zl.innerHTML = d.zones.map(z => `
-        <div class="zone-item">
-          <span class="zone-name">${z.zone}</span>
-          <span class="zone-badge badge-${z.status}">${z.net_flow_mw > 0 ? '+' : ''}${z.net_flow_mw} MW · ${z.status}</span>
-        </div>
-      `).join('');
+      // 3. Facility pins (top layer)
+      d.pins.features.forEach(f => {
+        const [lon, lat] = f.geometry.coordinates;
+        const p          = f.properties;
+        const isHighRisk = p.outage_risk === 'high';
+        const riskColor  = { high: '#f87171', medium: '#fbbf24', low: '#4ade80' }[p.outage_risk] || '#94a3b8';
+
+        const circle = L.circleMarker([lat, lon], {
+          radius:      p.radius,
+          fillColor:   isHighRisk ? '#f87171' : p.color,
+          color:       isHighRisk ? '#fca5a5' : '#fff',
+          weight:      isHighRisk ? 2 : 1,
+          fillOpacity: 0.9,
+        });
+
+        circle.bindPopup(`
+          <div style="font-family:system-ui;min-width:210px">
+            <b style="font-size:0.95rem">${p.facility_name}</b>
+            <div style="margin:5px 0 4px;font-size:0.78rem;color:#94a3b8">${p.zone_id} · ${p.source_type}</div>
+            <div style="font-size:0.82rem;display:grid;grid-template-columns:1fr 1fr;gap:3px 12px;margin-bottom:6px">
+              <span>⚡ Gen: <b>${p.generation_mw ?? 0} MW</b></span>
+              <span>🏭 Cap: <b>${p.capacity_mw ?? '—'} MW</b></span>
+              <span>📥 Cons: <b>${p.consumption_mw ?? 0} MW</b></span>
+              <span>💨 CO₂: <b>${p.co2_lbs_per_mwh ?? '—'}</b></span>
+              ${p.allocation_pct < 1 ? `<span style="grid-column:1/-1;color:#f59e0b">⚖ Allocation: ${Math.round(p.allocation_pct*100)}% to this zone</span>` : ''}
+            </div>
+            ${p.outage_risk ? `<div style="padding:4px 8px;background:${riskColor}22;border-left:3px solid ${riskColor};font-size:0.78rem;border-radius:3px">
+              ⚠ Outage risk: <b style="color:${riskColor}">${p.outage_risk.toUpperCase()}</b>
+              ${p.last_outage_date ? ` · Last: ${p.last_outage_date}` : ''}
+              ${p.outage_duration ? ` (${p.outage_duration}h)` : ''}
+            </div>` : ''}
+            ${p.notes ? `<div style="margin-top:5px;font-size:0.75rem;color:#94a3b8;font-style:italic">${p.notes}</div>` : ''}
+          </div>
+        `);
+        pinsLayer.addLayer(circle);
+      });
+
+      // 4. Sidebar zone list (only zones with actual data)
+      const zl    = document.getElementById('zoneList');
+      const stats = d.zone_stats || [];
+      zl.innerHTML = stats.length
+        ? stats.map(z => `
+            <div class="zone-item">
+              <span class="zone-name">${z.zone_id}</span>
+              <span class="zone-badge badge-${z.status}">${z.net_flow_mw >= 0 ? '+' : ''}${z.net_flow_mw} MW · ${z.status}</span>
+            </div>
+          `).join('')
+        : '<div class="empty-state">Load data to see zone status</div>';
+
     } catch (e) {
       console.error('map error', e);
     }
