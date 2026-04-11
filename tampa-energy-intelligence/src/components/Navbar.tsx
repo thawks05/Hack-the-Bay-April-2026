@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { backendStatus } from '@/lib/api';
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
@@ -14,6 +16,13 @@ const NAV_LINKS = [
 
 export default function Navbar() {
   const pathname = usePathname();
+  const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    backendStatus().then(setApiOnline);
+    const interval = setInterval(() => backendStatus().then(setApiOnline), 15000);
+    return () => clearInterval(interval);
+  }, []);
 
   return (
     <nav
@@ -125,27 +134,40 @@ export default function Navbar() {
         })}
       </div>
 
-      {/* Right — Status Badge */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-          flexShrink: 0,
-        }}
-      >
-        {/* Green dot */}
-        <div
-          style={{
-            width: '5px',
-            height: '5px',
-            borderRadius: '50%',
-            backgroundColor: '#14B8A6',
-            boxShadow: '0 0 6px rgba(20,184,166,0.6)',
-            flexShrink: 0,
-          }}
-        />
-        {/* Teal pill badge */}
+      {/* Right — Status Badges */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0 }}>
+        {/* API status pill */}
+        {apiOnline !== null && (
+          <span
+            title={apiOnline ? 'Python API connected' : 'Python API offline — using static data'}
+            style={{
+              fontSize: '11px',
+              fontWeight: 500,
+              color: apiOnline ? '#14B8A6' : '#F59E0B',
+              backgroundColor: apiOnline ? 'rgba(20,184,166,0.1)' : 'rgba(245,158,11,0.1)',
+              border: `1px solid ${apiOnline ? 'rgba(20,184,166,0.25)' : 'rgba(245,158,11,0.25)'}`,
+              padding: '2px 8px',
+              borderRadius: '20px',
+              whiteSpace: 'nowrap',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+            }}
+          >
+            <span
+              style={{
+                width: '5px',
+                height: '5px',
+                borderRadius: '50%',
+                backgroundColor: apiOnline ? '#14B8A6' : '#F59E0B',
+                display: 'inline-block',
+                boxShadow: `0 0 5px ${apiOnline ? 'rgba(20,184,166,0.6)' : 'rgba(245,158,11,0.6)'}`,
+              }}
+            />
+            API {apiOnline ? 'Online' : 'Offline'}
+          </span>
+        )}
+        {/* Data loaded pill */}
         <span
           style={{
             fontSize: '11px',

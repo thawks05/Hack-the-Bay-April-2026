@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { askGemini, ChatMessage } from '@/lib/gemini';
+import { sendChat, backendStatus } from '@/lib/api';
 import { getPageContext } from '@/lib/pageContext';
 import { CITY_KPIS, DISTRICTS, PROJECTS, ALERTS } from '@/lib/districts';
 
@@ -26,8 +27,14 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<ChatMessage[]>([WELCOME]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [usingBackend, setUsingBackend] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Check if Timothy's backend is available on mount
+  useEffect(() => {
+    backendStatus().then(setUsingBackend);
+  }, []);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,9 +50,27 @@ export default function ChatPage() {
     setIsLoading(true);
 
     try {
-      const pageContext = getPageContext('/chat');
-      const history = messages.filter((m) => m !== WELCOME);
-      const reply = await askGemini(userText, pageContext, history);
+      let reply: string;
+
+      if (usingBackend) {
+        // Use Timothy's Gemma 4 backend
+        const res = await sendChat(userText, true);
+        reply = res.response;
+        // If backend also returned project recommendations, append a summary
+        if (res.recommendations && res.recommendations.length > 0) {
+          const topProjects = res.recommendations
+            .slice(0, 3)
+            .map((p, i) => `${i + 1}. ${p.name} (score: ${p.score})`)
+            .join('\n');
+          reply += `\n\n**Top recommendations:**\n${topProjects}`;
+        }
+      } else {
+        // Fallback to Gemini
+        const pageContext = getPageContext('/chat');
+        const history = messages.filter((m) => m !== WELCOME);
+        reply = await askGemini(userText, pageContext, history);
+      }
+
       setMessages((prev) => [...prev, { role: 'model', content: reply }]);
     } catch {
       setMessages((prev) => [
@@ -56,7 +81,7 @@ export default function ChatPage() {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
-  }, [input, isLoading, messages]);
+  }, [input, isLoading, messages, usingBackend]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -265,7 +290,7 @@ export default function ChatPage() {
             <div style={{ fontSize: '14px', fontWeight: 700, color: '#F9FAFB' }}>Tampa Energy AI</div>
             <div style={{ fontSize: '11px', color: '#9CA3AF', display: 'flex', alignItems: 'center', gap: '5px' }}>
               <span style={{ width: '5px', height: '5px', borderRadius: '50%', backgroundColor: '#14B8A6', display: 'inline-block' }} />
-              Online · Full city data context loaded · Powered by Gemini
+              Online · {usingBackend ? 'Powered by Gemma 4 (Timothy\'s backend)' : 'Powered by Gemini (backend offline)'}
             </div>
           </div>
           <div style={{ marginLeft: 'auto' }}>
