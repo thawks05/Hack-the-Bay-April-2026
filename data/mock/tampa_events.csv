@@ -1,0 +1,6 @@
+timestamp,facility_id,facility_name,address,lat,lon,source_type,fuel_type,capacity_mw,generation_mw,consumption_mw,import_mw,export_mw,co2_lbs_per_mwh,loss_mw,peak_load_mw,avg_load_mw,operating_status,zone
+2024-01-27 10:00:00,EVT001,Gasparilla Invasion Event Load,Bayshore Blvd,27.9239,-82.4764,consumer,mixed,0,0,35,35,0,0,0,40,35,event,Downtown Core
+2024-01-27 10:00:00,EVT002,Gasparilla Parade Route Load,W Kennedy Blvd,27.9517,-82.4612,consumer,mixed,0,0,18,18,0,0,0,22,18,event,Downtown Core
+2024-01-27 10:00:00,EVT003,Gasparilla Emergency Generator,Curtis Hixon Park,27.9459,-82.4592,generator,diesel,2,1.8,0,0,0,2200,0.1,2,1.8,event,Downtown Core
+2024-03-16 12:00:00,EVT004,St Patricks Day Downtown Surge,700 N Franklin St,27.9489,-82.4598,consumer,mixed,0,0,12,12,0,0,0,15,12,event,Downtown Core
+2024-04-20 09:00:00,EVT005,Tampa Bay Lightning Game Load,Amalie Arena,27.9428,-82.4522,consumer,mixed,0,0,8,8,0,0,0,10,8,event,Channel District

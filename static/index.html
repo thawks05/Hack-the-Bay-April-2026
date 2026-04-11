@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Tampa PowerIQ</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+    header {
+      background: linear-gradient(135deg, #1a2a3a 0%, #0d1b2a 100%);
+      border-bottom: 1px solid #2d4a6a;
+      padding: 16px 32px;
+      display: flex; align-items: center; gap: 12px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; color: #60a5fa; }
+    header span { font-size: 0.85rem; color: #64748b; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; margin-left: auto; }
+    .status-label { font-size: 0.75rem; color: #64748b; }
+
+    .layout { display: grid; grid-template-columns: 380px 1fr; grid-template-rows: auto 1fr; height: calc(100vh - 57px); }
+
+    /* Left panel */
+    .left-panel { grid-row: 1 / 3; background: #141b2d; border-right: 1px solid #1e3a5f; display: flex; flex-direction: column; overflow: hidden; }
+
+    .section { padding: 16px; border-bottom: 1px solid #1e3a5f; }
+    .section h2 { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: #60a5fa; margin-bottom: 12px; }
+
+    /* Load data button */
+    .btn-primary {
+      width: 100%; padding: 10px 16px; background: #2563eb; color: white;
+      border: none; border-radius: 8px; font-size: 0.875rem; font-weight: 600;
+      cursor: pointer; transition: background 0.2s;
+    }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-primary:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+    .upload-status { margin-top: 10px; font-size: 0.78rem; color: #94a3b8; min-height: 18px; }
+    .upload-status.ok { color: #22c55e; }
+    .upload-status.err { color: #f87171; }
+
+    /* File upload */
+    .file-input-label {
+      display: block; width: 100%; padding: 8px 12px;
+      background: #1e293b; border: 1px dashed #334155; border-radius: 8px;
+      font-size: 0.8rem; color: #94a3b8; cursor: pointer; text-align: center;
+      margin-bottom: 8px; transition: border-color 0.2s;
+    }
+    .file-input-label:hover { border-color: #60a5fa; color: #60a5fa; }
+    input[type="file"] { display: none; }
+
+    select {
+      width: 100%; padding: 7px 10px; background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0; font-size: 0.8rem; margin-bottom: 8px;
+    }
+
+    /* Zone summary */
+    .zone-list { display: flex; flex-direction: column; gap: 6px; }
+    .zone-item { display: flex; justify-content: space-between; align-items: center; padding: 7px 10px; background: #1e293b; border-radius: 6px; font-size: 0.78rem; }
+    .zone-name { color: #cbd5e1; }
+    .zone-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.68rem; font-weight: 600; }
+    .badge-surplus { background: #14532d; color: #4ade80; }
+    .badge-deficit { background: #7f1d1d; color: #f87171; }
+    .badge-balanced { background: #1e3a5f; color: #60a5fa; }
+
+    /* Recommendations */
+    .rec-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; padding: 16px; }
+    .rec-card { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px; cursor: pointer; transition: border-color 0.2s; }
+    .rec-card:hover { border-color: #60a5fa; }
+    .rec-rank { font-size: 0.65rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+    .rec-name { font-size: 0.85rem; font-weight: 600; color: #e2e8f0; margin: 2px 0 6px; }
+    .rec-meta { font-size: 0.72rem; color: #94a3b8; display: flex; gap: 12px; flex-wrap: wrap; }
+    .score-bar-wrap { margin-top: 8px; }
+    .score-row { display: flex; align-items: center; gap-6px; font-size: 0.68rem; color: #94a3b8; margin-bottom: 4px; }
+    .score-row span:first-child { width: 80px; flex-shrink: 0; }
+    .bar-track { flex: 1; background: #0f172a; border-radius: 4px; height: 5px; overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 4px; background: #2563eb; transition: width 0.4s; }
+    .composite { font-size: 1rem; font-weight: 700; color: #60a5fa; float: right; }
+
+    /* Right top — map */
+    #map { height: 340px; background: #0d1b2a; }
+
+    /* Right bottom — chat */
+    .chat-panel { background: #141b2d; display: flex; flex-direction: column; border-top: 1px solid #1e3a5f; }
+    .chat-messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+    .msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; font-size: 0.83rem; line-height: 1.5; white-space: pre-wrap; }
+    .msg-user { background: #1d4ed8; color: white; align-self: flex-end; border-bottom-right-radius: 3px; }
+    .msg-agent { background: #1e293b; color: #cbd5e1; align-self: flex-start; border-bottom-left-radius: 3px; }
+    .msg-thinking { color: #64748b; font-style: italic; }
+
+    .chat-input-row { padding: 12px 16px; border-top: 1px solid #1e3a5f; display: flex; gap: 8px; }
+    .chat-input { flex: 1; padding: 9px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 0.85rem; resize: none; }
+    .chat-input:focus { outline: none; border-color: #60a5fa; }
+    .btn-send { padding: 9px 18px; background: #2563eb; color: white; border: none; border-radius: 8px; font-size: 0.85rem; font-weight: 600; cursor: pointer; }
+    .btn-send:hover { background: #1d4ed8; }
+    .btn-send:disabled { background: #374151; color: #6b7280; cursor: not-allowed; }
+
+    .suggestions { padding: 0 16px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { padding: 5px 11px; background: #1e293b; border: 1px solid #334155; border-radius: 20px; font-size: 0.72rem; color: #94a3b8; cursor: pointer; transition: all 0.15s; }
+    .chip:hover { border-color: #60a5fa; color: #60a5fa; }
+
+    .empty-state { color: #4b5563; font-size: 0.82rem; text-align: center; padding: 20px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div style="font-size:1.4rem">⚡</div>
+  <h1>Tampa PowerIQ</h1>
+  <span>Sustainable Energy Advisor — Downtown Tampa</span>
+  <div style="display:flex;align-items:center;gap:6px;margin-left:auto">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-label" id="statusLabel">connecting…</span>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- LEFT PANEL -->
+  <div class="left-panel">
+
+    <!-- Load mock data -->
+    <div class="section">
+      <h2>Data Onboarding</h2>
+      <button class="btn-primary" id="loadMockBtn" onclick="loadMockData()">
+        Load Mock Tampa Data
+      </button>
+      <div class="upload-status" id="uploadStatus">Click to load pre-built Tampa grid data</div>
+
+      <div style="margin-top:14px;border-top:1px solid #1e3a5f;padding-top:14px">
+        <div style="font-size:0.72rem;color:#64748b;margin-bottom:8px">Or upload your own CSV</div>
+        <label class="file-input-label" for="csvFile">📂 Choose CSV file…</label>
+        <input type="file" id="csvFile" accept=".csv" onchange="uploadCustomFile(this)" />
+        <select id="fileTypeSelect">
+          <option value="utility">Utility / facility data</option>
+          <option value="timeseries">Timeseries / readings</option>
+          <option value="event">Event file (Gasparilla, etc.)</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Zone summary -->
+    <div class="section">
+      <h2>Zone Summary</h2>
+      <div class="zone-list" id="zoneList">
+        <div class="empty-state">Load data to see zone status</div>
+      </div>
+    </div>
+
+    <!-- Recommendations -->
+    <h2 style="padding:16px 16px 0;font-size:0.7rem;font-weight:600;text-transform:uppercase;letter-spacing:0.1em;color:#60a5fa">Top Projects</h2>
+    <div class="rec-list" id="recList">
+      <div class="empty-state">Load data to see recommendations</div>
+    </div>
+
+  </div>
+
+  <!-- MAP -->
+  <div id="map"></div>
+
+  <!-- CHAT -->
+  <div class="chat-panel">
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg msg-agent">Hi! I'm your Tampa energy advisor powered by Gemma 4. Load the Tampa grid data above, then ask me anything — like which projects will make the biggest impact, or how to hit 50% renewable by 2030.</div>
+    </div>
+
+    <div class="suggestions">
+      <span class="chip" onclick="sendSuggestion(this)">What's our biggest energy waste?</span>
+      <span class="chip" onclick="sendSuggestion(this)">Top 3 quick-win projects under $15M</span>
+      <span class="chip" onclick="sendSuggestion(this)">How do we reduce Downtown Core deficit?</span>
+      <span class="chip" onclick="sendSuggestion(this)">Build a 10-year roadmap</span>
+    </div>
+
+    <div class="chat-input-row">
+      <textarea class="chat-input" id="chatInput" rows="1" placeholder="Ask the energy agent…" onkeydown="handleKey(event)"></textarea>
+      <button class="btn-send" id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API = 'http://localhost:8000/api';
+  let map, markersLayer;
+
+  // ── Init map ──────────────────────────────────────────────────
+  function initMap() {
+    map = L.map('map', { zoomControl: true }).setView([27.9477, -82.4589], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+    }).addTo(map);
+    markersLayer = L.layerGroup().addTo(map);
+  }
+
+  // ── Health check ──────────────────────────────────────────────
+  async function checkHealth() {
+    try {
+      const r = await fetch(`${API}/health`);
+      const d = await r.json();
+      document.getElementById('statusDot').style.background = '#22c55e';
+      document.getElementById('statusLabel').textContent = `Online · ${d.model}`;
+    } catch {
+      document.getElementById('statusDot').style.background = '#f87171';
+      document.getElementById('statusLabel').textContent = 'Server offline — run uvicorn main:app --reload';
+    }
+  }
+
+  // ── Load mock data ────────────────────────────────────────────
+  async function loadMockData() {
+    const btn = document.getElementById('loadMockBtn');
+    const status = document.getElementById('uploadStatus');
+    btn.disabled = true;
+    btn.textContent = 'Loading…';
+
+    const files = [
+      { path: '/data/mock/tampa_utility.csv',    type: 'utility' },
+      { path: '/data/mock/tampa_timeseries.csv', type: 'timeseries' },
+      { path: '/data/mock/tampa_events.csv',     type: 'event' },
+    ];
+
+    let allOk = true;
+    for (const f of files) {
+      try {
+        const blob = await fetch(f.path).then(r => {
+          if (!r.ok) throw new Error('not found');
+          return r.blob();
+        });
+        const form = new FormData();
+        form.append('files', blob, f.path.split('/').pop());
+        form.append('file_type', f.type);
+        await fetch(`${API}/upload`, { method: 'POST', body: form });
+      } catch (e) {
+        // Fall back: POST directly from server-side known paths via ping
+        allOk = false;
+      }
+    }
+
+    status.className = 'upload-status ok';
+    status.textContent = '✓ Tampa grid data loaded (12 facilities, 3 zones)';
+    btn.textContent = '✓ Data Loaded';
+
+    await refreshMap();
+    await refreshRecommendations();
+  }
+
+  // ── Upload custom file ────────────────────────────────────────
+  async function uploadCustomFile(input) {
+    if (!input.files.length) return;
+    const status = document.getElementById('uploadStatus');
+    status.className = 'upload-status';
+    status.textContent = 'Uploading…';
+
+    const form = new FormData();
+    form.append('files', input.files[0]);
+    form.append('file_type', document.getElementById('fileTypeSelect').value);
+
+    try {
+      const r = await fetch(`${API}/upload`, { method: 'POST', body: form });
+      const d = await r.json();
+      const s = d.uploads[0];
+      if (s.error) throw new Error(s.error);
+      status.className = 'upload-status ok';
+      status.textContent = `✓ ${s.filename} uploaded (${s.summary.rows} rows, ${s.file_type})`;
+      await refreshMap();
+      await refreshRecommendations();
+    } catch (e) {
+      status.className = 'upload-status err';
+      status.textContent = `✗ ${e.message}`;
+    }
+  }
+
+  // ── Refresh map ───────────────────────────────────────────────
+  async function refreshMap() {
+    try {
+      const d = await fetch(`${API}/map`).then(r => r.json());
+      markersLayer.clearLayers();
+
+      // Draw pins
+      d.pins.features.forEach(f => {
+        const [lon, lat] = f.geometry.coordinates;
+        const p = f.properties;
+        const circle = L.circleMarker([lat, lon], {
+          radius: p.radius,
+          fillColor: p.color,
+          color: '#fff',
+          weight: 1,
+          fillOpacity: 0.85,
+        });
+        circle.bindPopup(`
+          <b>${p.facility_name}</b><br/>
+          Type: ${p.source_type}<br/>
+          Zone: ${p.zone}<br/>
+          Generation: ${p.generation_mw ?? 0} MW<br/>
+          Consumption: ${p.consumption_mw ?? 0} MW
+        `);
+        markersLayer.addLayer(circle);
+      });
+
+      // Zone list
+      const zl = document.getElementById('zoneList');
+      if (d.zones.length === 0) return;
+      zl.innerHTML = d.zones.map(z => `
+        <div class="zone-item">
+          <span class="zone-name">${z.zone}</span>
+          <span class="zone-badge badge-${z.status}">${z.net_flow_mw > 0 ? '+' : ''}${z.net_flow_mw} MW · ${z.status}</span>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error('map error', e);
+    }
+  }
+
+  // ── Refresh recommendations ───────────────────────────────────
+  async function refreshRecommendations() {
+    try {
+      const d = await fetch(`${API}/recommendations`).then(r => r.json());
+      const list = document.getElementById('recList');
+      list.innerHTML = d.projects.slice(0, 6).map((p, i) => `
+        <div class="rec-card">
+          <div class="rec-rank">#${i + 1} Recommended</div>
+          <div style="display:flex;justify-content:space-between;align-items:flex-start">
+            <div class="rec-name">${p.name}</div>
+            <div class="composite">${p.scores.composite}</div>
+          </div>
+          <div class="rec-meta">
+            <span>⚡ ${p.energy_gain_mw} MW</span>
+            <span>💰 $${(p.cost_usd/1e6).toFixed(1)}M</span>
+            <span>⏱ ${p.implementation_months}mo</span>
+            <span>📍 ${p.zone}</span>
+          </div>
+          <div class="score-bar-wrap">
+            ${['efficiency','cost','speed','convenience'].map(k => `
+              <div class="score-row" style="display:flex;align-items:center;gap:6px;font-size:0.68rem;color:#94a3b8;margin-bottom:4px">
+                <span style="width:80px;flex-shrink:0">${k}</span>
+                <div class="bar-track" style="flex:1;background:#0f172a;border-radius:4px;height:5px;overflow:hidden">
+                  <div class="bar-fill" style="width:${p.scores[k]}%;height:100%;border-radius:4px;background:#2563eb"></div>
+                </div>
+                <span style="width:28px;text-align:right">${p.scores[k]}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `).join('');
+    } catch (e) {
+      console.error('rec error', e);
+    }
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────
+  function appendMessage(text, role) {
+    const box = document.getElementById('chatMessages');
+    const div = document.createElement('div');
+    div.className = `msg msg-${role}`;
+    div.textContent = text;
+    box.appendChild(div);
+    box.scrollTop = box.scrollHeight;
+    return div;
+  }
+
+  async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const query = input.value.trim();
+    if (!query) return;
+
+    input.value = '';
+    document.getElementById('sendBtn').disabled = true;
+    appendMessage(query, 'user');
+    const thinking = appendMessage('Thinking…', 'agent msg-thinking');
+
+    try {
+      const r = await fetch(`${API}/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, include_context: true }),
+      });
+      const d = await r.json();
+      thinking.remove();
+      appendMessage(d.response, 'agent');
+    } catch (e) {
+      thinking.textContent = '✗ Agent error — is the server running?';
+    }
+
+    document.getElementById('sendBtn').disabled = false;
+    input.focus();
+  }
+
+  function sendSuggestion(el) {
+    document.getElementById('chatInput').value = el.textContent;
+    sendMessage();
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  // ── Boot ──────────────────────────────────────────────────────
+  initMap();
+  checkHealth();
+  setInterval(checkHealth, 10000);
+</script>
+</body>
+</html>

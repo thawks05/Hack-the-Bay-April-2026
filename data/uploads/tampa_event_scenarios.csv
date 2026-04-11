@@ -1,0 +1,31 @@
+timestamp,facility_id,facility_name,address,lat,lon,source_type,fuel_type,capacity_mw,generation_mw,consumption_mw,import_mw,export_mw,co2_lbs_per_mwh,operating_status,zone
+2026-01-25T14:00:00Z,FAC-001,TECO Hillsborough Substation,"1702 N Florida Ave, Tampa, FL 33602",27.9510,-82.4560,substation,natural_gas,420,415,0,415,0,1050,critical,Downtown Core
+2026-01-25T14:00:00Z,FAC-002,Duke Energy Grid Interconnect,"4801 E Adamo Dr, Tampa, FL 33605",27.9465,-82.4105,substation,grid_import,165,165,0,165,0,900,online,Ybor City
+2026-01-25T14:00:00Z,FAC-003,Convention Center Rooftop Solar,"333 S Franklin St, Tampa, FL 33602",27.9428,-82.4593,generator,solar,8,5.1,0,0,0,0,online,Downtown Core
+2026-01-25T14:00:00Z,FAC-005,Downtown Battery Hub A,"500 N Ashley Dr, Tampa, FL 33602",27.9495,-82.4570,storage,battery,30,30,0,0,0,0,discharging,Downtown Core
+2026-01-25T14:00:00Z,FAC-006,Amalie Arena,"401 Channelside Dr, Tampa, FL 33602",27.9427,-82.4519,consumer,electric,0,0,68,68,0,0,online,Downtown Core
+2026-01-25T14:00:00Z,FAC-007,Tampa Convention Center,"333 S Franklin St, Tampa, FL 33602",27.9428,-82.4593,consumer,electric,0,0,45,45,0,0,online,Downtown Core
+2026-01-25T14:00:00Z,FAC-040,Channelside Substation,"615 Channelside Dr, Tampa, FL 33602",27.9423,-82.4479,substation,natural_gas,70,68,0,68,0,1050,warning,Channel District
+2026-01-25T14:00:00Z,FAC-041,Channelside Waterfront Solar,"600 Channelside Dr, Tampa, FL 33602",27.9415,-82.4465,generator,solar,12,8.2,0,0,0,0,online,Channel District
+2026-01-25T14:00:00Z,FAC-043,Channelside Battery Hub,"700 Channelside Dr, Tampa, FL 33602",27.9418,-82.4472,storage,battery,20,20,0,0,0,0,discharging,Channel District
+2026-01-25T14:00:00Z,FAC-044,Channelside Entertainment & Retail,"615 Channelside Dr, Tampa, FL 33602",27.9412,-82.4458,consumer,electric,0,0,65,65,0,0,online,Channel District
+2026-07-15T15:00:00Z,FAC-001,TECO Hillsborough Substation,"1702 N Florida Ave, Tampa, FL 33602",27.9510,-82.4560,substation,natural_gas,420,418,0,418,0,1050,critical,Downtown Core
+2026-07-15T15:00:00Z,FAC-003,Convention Center Rooftop Solar,"333 S Franklin St, Tampa, FL 33602",27.9428,-82.4593,generator,solar,8,7.8,0,0,0,0,online,Downtown Core
+2026-07-15T15:00:00Z,FAC-005,Downtown Battery Hub A,"500 N Ashley Dr, Tampa, FL 33602",27.9495,-82.4570,storage,battery,30,30,0,0,0,0,discharging,Downtown Core
+2026-07-15T15:00:00Z,FAC-008,Downtown Office Cluster A,"400 N Tampa St, Tampa, FL 33602",27.9490,-82.4580,consumer,electric,0,0,62,62,0,0,online,Downtown Core
+2026-07-15T15:00:00Z,FAC-010,Ybor City Substation,"1801 N 15th St, Tampa, FL 33605",27.9601,-82.4385,substation,natural_gas,95,94,0,94,0,1050,critical,Ybor City
+2026-07-15T15:00:00Z,FAC-011,Ybor Rooftop Solar Array,"1600 E 7th Ave, Tampa, FL 33605",27.9601,-82.4385,generator,solar,5,4.8,0,0,0,0,online,Ybor City
+2026-07-15T15:00:00Z,FAC-012,Ybor Battery Hub B,"1500 N 19th St, Tampa, FL 33605",27.9598,-82.4352,storage,battery,15,15,0,0,0,0,discharging,Ybor City
+2026-07-15T15:00:00Z,FAC-020,South Tampa Rooftop Solar Network,"4200 W Swann Ave, Tampa, FL 33609",27.9268,-82.5035,generator,solar,20,19.5,0,0,4.2,0,online,South Tampa
+2026-07-15T15:00:00Z,FAC-030,Port Tampa Main Substation,"1101 Channelside Dr, Tampa, FL 33602",27.9225,-82.4345,substation,natural_gas,200,198,0,198,0,1050,critical,Port Tampa
+2026-07-15T15:00:00Z,FAC-033,Port Tampa Cargo Operations,"1101 Channelside Dr, Tampa, FL 33602",27.9188,-82.4312,consumer,electric,0,0,178,178,0,0,online,Port Tampa
+2026-10-05T10:00:00Z,FAC-001,TECO Hillsborough Substation,"1702 N Florida Ave, Tampa, FL 33602",27.9510,-82.4560,substation,natural_gas,420,290,0,290,0,1050,warning,Downtown Core
+2026-10-05T10:00:00Z,FAC-002,Duke Energy Grid Interconnect,"4801 E Adamo Dr, Tampa, FL 33605",27.9465,-82.4105,substation,grid_import,165,165,0,165,0,900,online,Ybor City
+2026-10-05T10:00:00Z,FAC-003,Convention Center Rooftop Solar,"333 S Franklin St, Tampa, FL 33602",27.9428,-82.4593,generator,solar,8,1.2,0,0,0,0,online,Downtown Core
+2026-10-05T10:00:00Z,FAC-005,Downtown Battery Hub A,"500 N Ashley Dr, Tampa, FL 33602",27.9495,-82.4570,storage,battery,30,30,0,0,0,0,discharging,Downtown Core
+2026-10-05T10:00:00Z,FAC-011,Ybor Rooftop Solar Array,"1600 E 7th Ave, Tampa, FL 33605",27.9601,-82.4385,generator,solar,5,0.8,0,0,0,0,online,Ybor City
+2026-10-05T10:00:00Z,FAC-016,West Tampa Residential Solar Network,"3200 W Columbus Dr, Tampa, FL 33607",27.9618,-82.4820,generator,solar,12,1.5,0,0,0,0,online,West Tampa
+2026-10-05T10:00:00Z,FAC-020,South Tampa Rooftop Solar Network,"4200 W Swann Ave, Tampa, FL 33609",27.9268,-82.5035,generator,solar,20,2.1,0,0,0,0,online,South Tampa
+2026-10-05T10:00:00Z,FAC-022,Tampa General Hospital Microgrid,"1 Tampa General Cir, Tampa, FL 33606",27.9385,-82.4612,generator,solar,8,8,0,0,0,0,online,South Tampa
+2026-10-05T10:00:00Z,FAC-041,Channelside Waterfront Solar,"600 Channelside Dr, Tampa, FL 33602",27.9415,-82.4465,generator,solar,12,1.8,0,0,0,0,online,Channel District
+2026-10-05T10:00:00Z,FAC-042,Hillsborough Bay Wind Turbines,"Tampa Bay Offshore, FL",27.9200,-82.4350,generator,wind,5,4.8,0,0,0,0,online,Channel District

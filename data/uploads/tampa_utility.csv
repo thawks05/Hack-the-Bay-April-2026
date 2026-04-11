@@ -1,0 +1,13 @@
+timestamp,facility_id,facility_name,address,lat,lon,source_type,fuel_type,capacity_mw,generation_mw,consumption_mw,import_mw,export_mw,co2_lbs_per_mwh,loss_mw,peak_load_mw,avg_load_mw,operating_status,zone
+2024-01-15 08:00:00,FAC001,Gannon Natural Gas Plant,3806 N 22nd St,27.9897,-82.4489,generator,natural_gas,440,320,0,0,80,1150,12,440,310,operational,Port Tampa
+2024-01-15 08:00:00,FAC002,Macdill Solar Array,MacDill AFB,27.8492,-82.5213,solar,solar,25,18,0,0,5,0,0.5,25,15,operational,MacDill AFB
+2024-01-15 08:00:00,FAC003,Hillsborough Substation North,4400 N Lois Ave,27.9992,-82.5014,substation,grid_import,200,0,0,150,0,0,8,200,140,operational,West Tampa
+2024-01-15 08:00:00,FAC004,Downtown Core Demand Hub,400 N Ashley Dr,27.9477,-82.4589,consumer,mixed,0,0,185,185,0,0,0,210,180,operational,Downtown Core
+2024-01-15 08:00:00,FAC005,Channel District Substation,1101 Channelside Dr,27.9403,-82.4512,substation,grid_import,80,0,0,60,0,0,3,80,58,operational,Channel District
+2024-01-15 08:00:00,FAC006,Ybor City Demand Node,1600 E 7th Ave,27.9600,-82.4398,consumer,mixed,0,0,45,45,0,0,0,55,42,operational,Ybor City
+2024-01-15 08:00:00,FAC007,South Tampa Residential Load,3000 W Gandy Blvd,27.8793,-82.5122,consumer,mixed,0,0,95,95,0,0,0,110,88,operational,South Tampa
+2024-01-15 08:00:00,FAC008,Westshore Business Park,4830 W Kennedy Blvd,27.9523,-82.5236,consumer,mixed,0,0,120,120,0,0,0,145,112,operational,Westshore
+2024-01-15 08:00:00,FAC009,New Tampa Solar Farm,19020 Bruce B Downs Blvd,28.1392,-82.3499,solar,solar,60,42,0,0,10,0,1.5,60,38,operational,New Tampa
+2024-01-15 08:00:00,FAC010,Port Tampa Battery Storage,5000 Port Tampa Rd,27.8701,-82.5664,storage,battery,100,0,0,0,0,0,2,100,0,standby,Port Tampa
+2024-01-15 08:00:00,FAC011,Ybor City Solar Rooftop,1800 E 7th Ave,27.9605,-82.4378,solar,solar,8,6,0,0,1,0,0.2,8,5.5,operational,Ybor City
+2024-01-15 08:00:00,FAC012,MacDill Wind Pilot,MacDill AFB South,27.8320,-82.5198,wind,wind,12,8,0,0,2,0,0.3,12,7,operational,MacDill AFB
