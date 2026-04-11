@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import {
   LineChart,
   Line,
@@ -15,12 +16,15 @@ import {
   ReferenceLine,
 } from 'recharts';
 import {
-  CITY_KPIS,
   MONTHLY_TREND,
   HOURLY_PEAK,
   ALERTS,
-  DISTRICTS,
+  DISTRICTS as STATIC_DISTRICTS,
+  CITY_KPIS as STATIC_KPIS,
+  CityKpis,
+  District,
 } from '@/lib/districts';
+import { fetchDistricts, computeKpisFromDistricts } from '@/lib/api';
 import NoDataGate from '@/components/NoDataGate';
 
 const STATUS_COLOR: Record<string, string> = {
@@ -90,7 +94,17 @@ const CustomTooltipHourly = ({ active, payload, label }: any) => {
 };
 
 export default function DashboardPage() {
-  const districtsByMwh = [...DISTRICTS].sort((a, b) => b.mwh - a.mwh);
+  const [districts, setDistricts] = useState<District[]>(STATIC_DISTRICTS);
+  const [kpis, setKpis] = useState<CityKpis>(STATIC_KPIS);
+
+  useEffect(() => {
+    fetchDistricts().then((d) => {
+      setDistricts(d);
+      setKpis(computeKpisFromDistricts(d));
+    });
+  }, []);
+
+  const districtsByMwh = [...districts].sort((a, b) => b.mwh - a.mwh);
 
   return (
     <NoDataGate>
@@ -115,14 +129,14 @@ export default function DashboardPage() {
         }}
       >
         {[
-          { label: 'Total MWh', value: CITY_KPIS.totalMwh.toLocaleString(), unit: 'MWh', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
-          { label: 'Peak Demand', value: CITY_KPIS.peakMw, unit: 'MW', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
-          { label: 'Energy Waste', value: `${CITY_KPIS.wastePercent}%`, unit: '', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
-          { label: 'Renewable', value: `${CITY_KPIS.renewablePercent}%`, unit: '', color: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)' },
-          { label: 'Grid Capacity', value: `${CITY_KPIS.gridCapacityPercent}%`, unit: '', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)' },
-          { label: 'Clean Energy', value: `${CITY_KPIS.cleanEnergyPercent}%`, unit: '', color: '#14B8A6', bg: 'rgba(20,184,166,0.06)', border: 'rgba(20,184,166,0.15)' },
-          { label: 'Demand', value: `${CITY_KPIS.totalDemandMw}`, unit: 'MW', color: '#F59E0B', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.15)' },
-          { label: 'Grid Stress', value: CITY_KPIS.gridStress, unit: '', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
+          { label: 'Total MWh', value: kpis.totalMwh.toLocaleString(), unit: 'MWh', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
+          { label: 'Peak Demand', value: kpis.peakMw, unit: 'MW', color: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)' },
+          { label: 'Energy Waste', value: `${kpis.wastePercent}%`, unit: '', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
+          { label: 'Renewable', value: `${kpis.renewablePercent}%`, unit: '', color: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)' },
+          { label: 'Grid Capacity', value: `${kpis.gridCapacityPercent}%`, unit: '', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)' },
+          { label: 'Clean Energy', value: `${kpis.cleanEnergyPercent}%`, unit: '', color: '#14B8A6', bg: 'rgba(20,184,166,0.06)', border: 'rgba(20,184,166,0.15)' },
+          { label: 'Demand', value: `${kpis.totalDemandMw}`, unit: 'MW', color: '#F59E0B', bg: 'rgba(245,158,11,0.06)', border: 'rgba(245,158,11,0.15)' },
+          { label: 'Grid Stress', value: kpis.gridStress, unit: '', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
         ].map((kpi) => (
           <div
             key={kpi.label}
@@ -310,9 +324,9 @@ export default function DashboardPage() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
             {[
-              { label: 'Capacity Used', value: CITY_KPIS.gridCapacityPercent, color: '#F59E0B', max: 100 },
-              { label: 'Renewable Share', value: CITY_KPIS.renewablePercent, color: '#14B8A6', max: 100 },
-              { label: 'Clean Energy Mix', value: CITY_KPIS.cleanEnergyPercent, color: '#A78BFA', max: 100 },
+              { label: 'Capacity Used', value: kpis.gridCapacityPercent, color: '#F59E0B', max: 100 },
+              { label: 'Renewable Share', value: kpis.renewablePercent, color: '#14B8A6', max: 100 },
+              { label: 'Clean Energy Mix', value: kpis.cleanEnergyPercent, color: '#A78BFA', max: 100 },
             ].map((bar) => (
               <div key={bar.label}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
@@ -345,7 +359,7 @@ export default function DashboardPage() {
               }}
             >
               <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Grid Stress Level</span>
-              <span style={{ fontSize: '12px', fontWeight: 700, color: '#F59E0B' }}>{CITY_KPIS.gridStress}</span>
+              <span style={{ fontSize: '12px', fontWeight: 700, color: '#F59E0B' }}>{kpis.gridStress}</span>
             </div>
           </div>
         </div>

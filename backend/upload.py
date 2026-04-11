@@ -112,8 +112,28 @@ def clear_uploads():
 
 
 def get_session_summaries() -> dict:
-    """Used by other modules to access current upload context."""
+    """Used by other modules to access current upload context.
+    Re-populates from disk if the in-memory dict was cleared by a reload."""
+    if not _session_summaries:
+        _reload_summaries_from_disk()
     return _session_summaries
+
+
+def _reload_summaries_from_disk():
+    """Re-parse uploaded CSVs from disk and rebuild the in-memory summary dict."""
+    for fname in os.listdir(UPLOAD_DIR):
+        if not fname.endswith(".csv"):
+            continue
+        if fname in _session_summaries:
+            continue
+        path = os.path.join(UPLOAD_DIR, fname)
+        with open(path, "rb") as f:
+            raw = f.read()
+        try:
+            parsed = parse_and_clean(raw, fname)
+            _session_summaries[fname] = {k: _safe(v) for k, v in parsed["summary"].items()}
+        except Exception:
+            continue
 
 
 def get_uploaded_dataframes():

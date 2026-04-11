@@ -2,7 +2,8 @@
 
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
-import { DISTRICTS, District } from '@/lib/districts';
+import { DISTRICTS as STATIC_DISTRICTS, District } from '@/lib/districts';
+import { fetchDistricts } from '@/lib/api';
 import NoDataGate from '@/components/NoDataGate';
 
 const MapClient = dynamic(() => import('@/components/MapClient'), { ssr: false });
@@ -30,9 +31,14 @@ const STATUS_LABEL: Record<string, string> = {
 export default function MapPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeLayer, setActiveLayer] = useState<Layer>('energy');
+  const [districts, setDistricts] = useState<District[]>(STATIC_DISTRICTS);
+
+  useEffect(() => {
+    fetchDistricts().then(setDistricts);
+  }, []);
 
   const selectedDistrict: District | null =
-    DISTRICTS.find((d) => d.id === selectedId) ?? null;
+    districts.find((d) => d.id === selectedId) ?? null;
 
   // Persist to localStorage for AI context
   useEffect(() => {
@@ -226,7 +232,7 @@ export default function MapPage() {
             All Districts
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            {DISTRICTS.sort((a, b) => b.mwh - a.mwh).map((district) => (
+            {[...districts].sort((a, b) => b.mwh - a.mwh).map((district) => (
               <button
                 key={district.id}
                 onClick={() => handleSelect(district.id)}
@@ -306,6 +312,7 @@ export default function MapPage() {
           selectedId={selectedId}
           onSelect={handleSelect}
           activeLayer={activeLayer}
+          districts={districts}
         />
       </div>
     </div>

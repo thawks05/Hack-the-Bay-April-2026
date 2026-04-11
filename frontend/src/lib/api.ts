@@ -221,11 +221,49 @@ export async function fetchZonesConfig(): Promise<{ name_field: string; city_lab
 // ── Static helpers (KPIs, districts, alerts, trends) ────────────────────────
 
 export async function fetchDistricts(): Promise<District[]> {
-  return STATIC_DISTRICTS;
+  try {
+    const res = await fetch(`${BASE_URL}/api/districts`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) throw new Error();
+    const data = await res.json();
+    const live = (data.districts ?? []) as Partial<District>[];
+    if (!live.length) return STATIC_DISTRICTS;
+    // Overlay live stats onto static districts by name to preserve polygon coords
+    const liveByName: Record<string, Partial<District>> = {};
+    for (const d of live) {
+      if (d.name) liveByName[d.name.toLowerCase()] = d;
+    }
+    return STATIC_DISTRICTS.map((d) => {
+      const match = liveByName[d.name.toLowerCase()];
+      return match ? { ...d, ...match, coords: d.coords } : d;
+    });
+  } catch {
+    return STATIC_DISTRICTS;
+  }
+}
+
+export function computeKpisFromDistricts(districts: District[]): CityKpis {
+  if (!districts.length) return STATIC_KPIS;
+  const totalMwh = Math.round(districts.reduce((s, d) => s + d.mwh, 0));
+  const avgWaste = Math.round(districts.reduce((s, d) => s + d.waste, 0) / districts.length);
+  const avgRenewable = Math.round(districts.reduce((s, d) => s + d.renewable, 0) / districts.length);
+  const critical = districts.filter((d) => d.status === 'red').length;
+  return {
+    totalMwh,
+    peakMw: Math.round(totalMwh * 0.08),
+    wastePercent: avgWaste,
+    renewablePercent: avgRenewable,
+    gridStress: critical > 2 ? 'High' : critical > 0 ? 'Moderate' : 'Normal',
+    gridCapacityPercent: Math.min(95, Math.round((totalMwh / 8000) * 100)),
+    totalDemandMw: Math.round(totalMwh * 0.06),
+    cleanEnergyPercent: avgRenewable,
+  };
 }
 
 export async function fetchKpis(): Promise<CityKpis> {
-  return STATIC_KPIS;
+  const districts = await fetchDistricts();
+  return computeKpisFromDistricts(districts);
 }
 
 export async function fetchAlerts(): Promise<Alert[]> {

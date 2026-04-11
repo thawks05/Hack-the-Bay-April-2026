@@ -1,7 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { CITY_KPIS, ALERTS, DISTRICTS } from '@/lib/districts';
+import { useEffect, useState } from 'react';
+import { ALERTS, DISTRICTS as STATIC_DISTRICTS, CITY_KPIS as STATIC_KPIS, CityKpis, District } from '@/lib/districts';
+import { fetchDistricts, computeKpisFromDistricts } from '@/lib/api';
 
 const STATUS_COLOR: Record<string, string> = {
   red: '#EF4444',
@@ -102,46 +104,24 @@ const NAV_TILES = [
   },
 ];
 
-const KPI_CARDS = [
-  {
-    label: 'Total Consumption',
-    value: CITY_KPIS.totalMwh.toLocaleString(),
-    unit: 'MWh',
-    accent: '#3B82F6',
-    bg: 'rgba(59,130,246,0.08)',
-    border: 'rgba(59,130,246,0.2)',
-    sub: 'Monthly citywide total',
-  },
-  {
-    label: 'Peak Demand',
-    value: CITY_KPIS.peakMw,
-    unit: 'MW',
-    accent: '#EF4444',
-    bg: 'rgba(239,68,68,0.08)',
-    border: 'rgba(239,68,68,0.2)',
-    sub: 'Recorded this cycle',
-  },
-  {
-    label: 'Energy Waste',
-    value: `${CITY_KPIS.wastePercent}%`,
-    unit: '',
-    accent: '#F59E0B',
-    bg: 'rgba(245,158,11,0.08)',
-    border: 'rgba(245,158,11,0.2)',
-    sub: 'Avg across all districts',
-  },
-  {
-    label: 'Renewable Share',
-    value: `${CITY_KPIS.renewablePercent}%`,
-    unit: '',
-    accent: '#14B8A6',
-    bg: 'rgba(20,184,166,0.08)',
-    border: 'rgba(20,184,166,0.2)',
-    sub: 'Of total generation',
-  },
-];
-
 export default function HomePage() {
+  const [districts, setDistricts] = useState<District[]>(STATIC_DISTRICTS);
+  const [kpis, setKpis] = useState<CityKpis>(STATIC_KPIS);
+
+  useEffect(() => {
+    fetchDistricts().then((d) => {
+      setDistricts(d);
+      setKpis(computeKpisFromDistricts(d));
+    });
+  }, []);
+
+  const KPI_CARDS = [
+    { label: 'Total Consumption', value: kpis.totalMwh.toLocaleString(), unit: 'MWh', accent: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)', sub: 'Monthly citywide total' },
+    { label: 'Peak Demand', value: kpis.peakMw, unit: 'MW', accent: '#EF4444', bg: 'rgba(239,68,68,0.08)', border: 'rgba(239,68,68,0.2)', sub: 'Recorded this cycle' },
+    { label: 'Energy Waste', value: `${kpis.wastePercent}%`, unit: '', accent: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)', sub: 'Avg across all districts' },
+    { label: 'Renewable Share', value: `${kpis.renewablePercent}%`, unit: '', accent: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)', sub: 'Of total generation' },
+  ];
+
   return (
     <div style={{ padding: '32px 24px 60px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Hero */}
@@ -169,7 +149,7 @@ export default function HomePage() {
             }}
           />
           <span style={{ fontSize: '11px', color: '#93C5FD', fontWeight: 500 }}>
-            Live · Downtown Tampa Grid · {DISTRICTS.length} Districts
+            Live · Downtown Tampa Grid · {districts.length} Districts
           </span>
         </div>
         <h1
@@ -194,7 +174,7 @@ export default function HomePage() {
             lineHeight: 1.65,
           }}
         >
-          AI-powered smart city energy optimization across {DISTRICTS.length} downtown districts.
+          AI-powered smart city energy optimization across {districts.length} downtown districts.
           Monitor consumption, reduce waste, and accelerate Tampa&apos;s clean energy transition.
         </p>
       </div>
@@ -273,7 +253,7 @@ export default function HomePage() {
               fontWeight: 600,
             }}
           >
-            {CITY_KPIS.gridStress}
+            {kpis.gridStress}
           </span>
         </div>
         <div style={{ flex: 1, minWidth: '180px' }}>
@@ -282,14 +262,14 @@ export default function HomePage() {
               Capacity Used
             </span>
             <span style={{ fontSize: '12px', color: '#F9FAFB', fontWeight: 600 }}>
-              {CITY_KPIS.gridCapacityPercent}%
+              {kpis.gridCapacityPercent}%
             </span>
           </div>
           <div style={{ height: '5px', backgroundColor: 'rgba(255,255,255,0.07)', borderRadius: '3px', overflow: 'hidden' }}>
             <div
               style={{
                 height: '100%',
-                width: `${CITY_KPIS.gridCapacityPercent}%`,
+                width: `${kpis.gridCapacityPercent}%`,
                 backgroundColor: '#F59E0B',
                 borderRadius: '3px',
                 boxShadow: '0 0 8px rgba(245,158,11,0.4)',
@@ -302,7 +282,7 @@ export default function HomePage() {
             Demand
           </div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: '#F9FAFB' }}>
-            {CITY_KPIS.totalDemandMw} <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 400 }}>MW</span>
+            {kpis.totalDemandMw} <span style={{ fontSize: '11px', color: '#9CA3AF', fontWeight: 400 }}>MW</span>
           </div>
         </div>
         <div>
@@ -310,7 +290,7 @@ export default function HomePage() {
             Clean Energy
           </div>
           <div style={{ fontSize: '16px', fontWeight: 700, color: '#14B8A6' }}>
-            {CITY_KPIS.cleanEnergyPercent}%
+            {kpis.cleanEnergyPercent}%
           </div>
         </div>
       </div>

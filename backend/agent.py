@@ -41,21 +41,54 @@ Be concise, data-driven, and actionable. You are advising real city planners."""
 
 
 def build_context_block(grid_summary: dict | None) -> str:
-    """Build a text block from uploaded CSV summaries to inject into the prompt."""
-    if not grid_summary:
+    """Build a rich text block from uploaded CSV data to inject into the prompt."""
+    from backend.upload import get_uploaded_dataframes
+    dfs = get_uploaded_dataframes()
+
+    lines = ["\n--- UPLOADED ENERGY DATA ---"]
+
+    if not dfs and not grid_summary:
         return ""
 
-    lines = ["\n--- CURRENT TAMPA GRID DATA ---"]
-    for file_name, summary in grid_summary.items():
-        lines.append(f"\nFile: {file_name} ({summary.get('file_type', 'unknown')})")
-        lines.append(f"  Rows: {summary.get('rows', '?')}")
-        if summary.get("total_generation_mw") is not None:
-            lines.append(f"  Total Generation: {summary['total_generation_mw']} MW")
-        if summary.get("total_consumption_mw") is not None:
-            lines.append(f"  Total Consumption: {summary['total_consumption_mw']} MW")
-        if summary.get("zones"):
-            lines.append(f"  Zones: {', '.join(summary['zones'])}")
-    lines.append("--- END GRID DATA ---\n")
+    if dfs:
+        import pandas as pd
+        combined = pd.concat(dfs, ignore_index=True)
+
+        # Facility-level detail (cap at 40 rows to stay within context)
+        display_cols = [c for c in [
+            "facility_name", "zone_id", "source_type", "fuel_type",
+            "capacity_mw", "generation_mw", "consumption_mw",
+            "operating_status", "outage_risk",
+        ] if c in combined.columns]
+
+        lines.append(f"\nFacilities ({len(combined)} total):")
+        for _, row in combined[display_cols].head(40).iterrows():
+            parts = [f"{c}={row[c]}" for c in display_cols if str(row.get(c, "")) not in ("", "nan", "None")]
+            lines.append("  " + ", ".join(parts))
+
+        # Zone-level aggregates
+        if "zone_id" in combined.columns:
+            lines.append("\nZone aggregates:")
+            for zone, grp in combined.groupby("zone_id"):
+                gen = grp["generation_mw"].sum() if "generation_mw" in grp else 0
+                cons = grp["consumption_mw"].sum() if "consumption_mw" in grp else 0
+                lines.append(f"  {zone}: gen={gen:.1f} MW, cons={cons:.1f} MW, net={gen-cons:.1f} MW")
+
+        # Fleet-wide totals
+        gen_total = combined["generation_mw"].sum() if "generation_mw" in combined else 0
+        cons_total = combined["consumption_mw"].sum() if "consumption_mw" in combined else 0
+        lines.append(f"\nTotals: generation={gen_total:.1f} MW, consumption={cons_total:.1f} MW, net={gen_total-cons_total:.1f} MW")
+
+    elif grid_summary:
+        # Fallback to metadata summaries if dataframes unavailable
+        for file_name, summary in grid_summary.items():
+            lines.append(f"\nFile: {file_name} ({summary.get('file_type', 'unknown')}), rows={summary.get('rows','?')}")
+            if summary.get("total_generation_mw") is not None:
+                lines.append(f"  Generation={summary['total_generation_mw']} MW, Consumption={summary['total_consumption_mw']} MW")
+            if summary.get("zones"):
+                lines.append(f"  Zones: {', '.join(summary['zones'])}")
+
+    lines.append("--- END DATA ---\n")
     return "\n".join(lines)
 
 

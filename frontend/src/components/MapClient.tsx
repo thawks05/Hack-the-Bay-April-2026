@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, Tooltip, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Tooltip, CircleMarker, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DISTRICTS, District } from '@/lib/districts';
+import { fetchMapData } from '@/lib/api';
 
 const STATUS_FILL: Record<string, string> = {
   red: '#EF4444',
@@ -13,10 +14,20 @@ const STATUS_FILL: Record<string, string> = {
 
 type Layer = 'energy' | 'renewable' | 'waste';
 
+interface FacilityPin {
+  lat: number;
+  lon: number;
+  name: string;
+  source_type: string;
+  generation_mw: number;
+  consumption_mw: number;
+}
+
 interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   activeLayer: Layer;
+  districts?: District[];
 }
 
 function getLayerValue(d: District, layer: Layer): number {
@@ -59,10 +70,10 @@ function getLayerUnit(layer: Layer): string {
 }
 
 // Fit map to all district bounds on mount
-function MapFitter() {
+function MapFitter({ districts }: { districts: District[] }) {
   const map = useMap();
   useEffect(() => {
-    const allCoords = DISTRICTS.flatMap((d) => d.coords);
+    const allCoords = districts.flatMap((d) => d.coords);
     if (allCoords.length) {
       const lats = allCoords.map((c) => c[0]);
       const lngs = allCoords.map((c) => c[1]);
@@ -71,15 +82,42 @@ function MapFitter() {
         [Math.max(...lats) + 0.005, Math.max(...lngs) + 0.005],
       ]);
     }
-  }, [map]);
+  }, [map, districts]);
   return null;
 }
 
-export default function MapClient({ selectedId, onSelect, activeLayer }: Props) {
+const PIN_COLOR: Record<string, string> = {
+  solar: '#F59E0B',
+  wind: '#3B82F6',
+  storage: '#A78BFA',
+  generator: '#EF4444',
+  substation: '#6B7280',
+  consumer: '#14B8A6',
+};
+
+export default function MapClient({ selectedId, onSelect, activeLayer, districts: propDistricts }: Props) {
   const [isMounted, setIsMounted] = useState(false);
+  const [pins, setPins] = useState<FacilityPin[]>([]);
+  const districts = propDistricts ?? DISTRICTS;
 
   useEffect(() => {
     setIsMounted(true);
+    fetchMapData().then((geo) => {
+      const facilityPins: FacilityPin[] = (geo.features as unknown[])
+        .filter((f: unknown) => (f as { geometry?: { type?: string } }).geometry?.type === 'Point')
+        .map((f: unknown) => {
+          const feat = f as { geometry: { coordinates: number[] }; properties: Record<string, unknown> };
+          return {
+            lon: feat.geometry.coordinates[0],
+            lat: feat.geometry.coordinates[1],
+            name: String(feat.properties.name ?? ''),
+            source_type: String(feat.properties.source_type ?? 'generator'),
+            generation_mw: Number(feat.properties.generation_mw ?? 0),
+            consumption_mw: Number(feat.properties.consumption_mw ?? 0),
+          };
+        });
+      setPins(facilityPins);
+    });
   }, []);
 
   if (!isMounted) {
@@ -113,8 +151,8 @@ export default function MapClient({ selectedId, onSelect, activeLayer }: Props) 
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MapFitter />
-      {DISTRICTS.map((district) => {
+      <MapFitter districts={districts} />
+      {districts.map((district) => {
         const isSelected = selectedId === district.id;
         const color = getLayerColor(district, activeLayer);
         const layerVal = getLayerValue(district, activeLayer);
@@ -173,6 +211,32 @@ export default function MapClient({ selectedId, onSelect, activeLayer }: Props) 
           </Polygon>
         );
       })}
+
+      {/* Facility pins from uploaded CSV */}
+      {pins.map((pin, i) => (
+        <CircleMarker
+          key={i}
+          center={[pin.lat, pin.lon]}
+          radius={6}
+          pathOptions={{
+            color: PIN_COLOR[pin.source_type] ?? '#9CA3AF',
+            fillColor: PIN_COLOR[pin.source_type] ?? '#9CA3AF',
+            fillOpacity: 0.85,
+            weight: 1.5,
+          }}
+        >
+          <Tooltip direction="top" sticky>
+            <div style={{ fontFamily: 'Inter, sans-serif', minWidth: '160px' }}>
+              <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '4px' }}>{pin.name}</div>
+              <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1.6 }}>
+                Type: {pin.source_type}<br />
+                {pin.generation_mw > 0 && <>Gen: {pin.generation_mw} MW<br /></>}
+                {pin.consumption_mw > 0 && <>Cons: {pin.consumption_mw} MW<br /></>}
+              </div>
+            </div>
+          </Tooltip>
+        </CircleMarker>
+      ))}
     </MapContainer>
   );
 }
