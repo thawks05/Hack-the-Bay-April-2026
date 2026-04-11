@@ -3,12 +3,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { usePathname } from 'next/navigation';
 import { askGemini, ChatMessage } from '@/lib/gemini';
+import { sendChat, backendStatus } from '@/lib/api';
 import { getPageContext } from '@/lib/pageContext';
 
 const WELCOME_MESSAGE: ChatMessage = {
   role: 'model',
   content:
-    "Hello! I'm your Tampa Energy Intelligence AI. Ask me anything about district energy data, optimization strategies, or city planning insights.",
+    "Hello! I'm your Tampa Energy Intelligence AI powered by Gemma 4. Ask me anything about district energy data, optimization strategies, or city planning insights.",
 };
 
 export default function AIWidget() {
@@ -18,9 +19,15 @@ export default function AIWidget() {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hasNewInsight, setHasNewInsight] = useState(false);
+  const [useGemma, setUseGemma] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const insightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Check if Gemma 4 backend is available on mount
+  useEffect(() => {
+    backendStatus().then(setUseGemma);
+  }, []);
 
   // Show notification badge after 4s on mount
   useEffect(() => {
@@ -63,10 +70,29 @@ export default function AIWidget() {
     setIsLoading(true);
 
     try {
-      const pageContext = getPageContext(pathname);
-      // Pass all prior messages (except welcome if it's the first) as history
-      const history = messages.filter((m) => m !== WELCOME_MESSAGE);
-      const reply = await askGemini(text, pageContext, history);
+      let reply: string;
+      if (useGemma) {
+        // Try Gemma 4 via local backend first
+        try {
+          const result = await sendChat(text, true);
+          reply = result.response;
+          // Check if the backend silently fell offline (response is the offline message)
+          if (reply.startsWith('Backend offline')) {
+            setUseGemma(false);
+          }
+        } catch {
+          // Backend unreachable — fall back to Gemini
+          setUseGemma(false);
+          const pageContext = getPageContext(pathname);
+          const history = messages.filter((m) => m !== WELCOME_MESSAGE);
+          reply = await askGemini(text, pageContext, history);
+        }
+      } else {
+        // Gemini fallback
+        const pageContext = getPageContext(pathname);
+        const history = messages.filter((m) => m !== WELCOME_MESSAGE);
+        reply = await askGemini(text, pageContext, history);
+      }
       setMessages((prev) => [...prev, { role: 'model', content: reply }]);
     } catch {
       setMessages((prev) => [
@@ -239,7 +265,7 @@ export default function AIWidget() {
                       flexShrink: 0,
                     }}
                   />
-                  Online · {pageName} context
+                  {useGemma ? 'Gemma 4 · local' : 'Gemini · cloud'} · {pageName}
                 </div>
               </div>
             </div>

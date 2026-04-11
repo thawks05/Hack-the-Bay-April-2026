@@ -139,20 +139,82 @@ export async function fetchRoadmap(
 // ── CSV upload ───────────────────────────────────────────────────────────────
 
 export async function uploadCSV(
-  file: File
-): Promise<{ message: string; filename: string }> {
+  file: File,
+  fileType: 'utility' | 'timeseries' | 'event' = 'utility'
+): Promise<{ message: string; filename: string; summary?: unknown }> {
   const form = new FormData();
   form.append('file', file);
+  form.append('file_type', fileType);
   try {
     const res = await fetch(`${BASE_URL}/api/upload`, {
       method: 'POST',
       body: form,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    // Backend returns { uploads: [{ filename, file_type, summary }] }
+    const first = data.uploads?.[0] ?? data;
+    return {
+      message: first.error ? `Error: ${first.error}` : `Uploaded ${first.filename}`,
+      filename: first.filename ?? file.name,
+      summary: first.summary,
+    };
   } catch (err) {
     console.error('[API] upload failed', err);
     throw err;
+  }
+}
+
+// ── Uploaded files status ─────────────────────────────────────────────────────
+
+export interface UploadSummary {
+  rows: number;
+  file_type: string;
+  zones: string[];
+  source_types: string[];
+  total_generation_mw: number | null;
+  total_consumption_mw: number | null;
+}
+
+export async function fetchUploads(): Promise<Record<string, UploadSummary>> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/uploads`, {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return {};
+    const data = await res.json();
+    return data.uploads ?? {};
+  } catch {
+    return {};
+  }
+}
+
+// ── Zone GeoJSON upload ───────────────────────────────────────────────────────
+
+export async function uploadZoneGeoJSON(
+  file: File,
+  nameField: string,
+  cityLabel: string,
+): Promise<{ feature_count: number; name_field: string; city_label: string; sample_zones: string[] }> {
+  const form = new FormData();
+  form.append('file', file);
+  form.append('name_field', nameField);
+  form.append('city_label', cityLabel);
+  const res = await fetch(`${BASE_URL}/api/zones/upload`, { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.detail ?? 'Upload failed');
+  }
+  return res.json();
+}
+
+export async function fetchZonesConfig(): Promise<{ name_field: string; city_label: string; source: string }> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/zones/config`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) throw new Error();
+    return res.json();
+  } catch {
+    return { name_field: 'AssocLabel', city_label: 'Tampa, FL', source: 'default' };
   }
 }
 

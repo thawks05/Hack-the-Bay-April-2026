@@ -118,12 +118,24 @@ def score_projects(projects: list[dict] | None = None) -> list[dict]:
         scored.append(
             {
                 **p,
+                # Top-level fields the Next.js frontend expects
+                "id":         p["project_id"],
+                "score":      round(composite, 1),          # composite score 0-100
+                "district":   p.get("zone", ""),
+                "type":       p.get("tags", [""])[0] if p.get("tags") else "",
+                "cost":       f'${p["cost_usd"]/1e6:.1f}M',
+                "time":       f'{p["implementation_months"]} months',
+                "impact":     f'+{p["energy_gain_mw"]} MW' if p["energy_gain_mw"] else "Efficiency gain",
+                "efficiency": round(eff, 1),
+                "costScore":  round(cost, 1),
+                "speed":      round(speed, 1),
+                # Nested breakdown still available for the Python test UI
                 "scores": {
-                    "efficiency": round(eff, 1),
-                    "cost": round(cost, 1),
-                    "speed": round(speed, 1),
+                    "efficiency":  round(eff, 1),
+                    "cost":        round(cost, 1),
+                    "speed":       round(speed, 1),
                     "convenience": round(conv, 1),
-                    "composite": round(composite, 1),
+                    "composite":   round(composite, 1),
                 },
             }
         )

@@ -21,6 +21,7 @@ import {
   ALERTS,
   DISTRICTS,
 } from '@/lib/districts';
+import NoDataGate from '@/components/NoDataGate';
 
 const STATUS_COLOR: Record<string, string> = {
   red: '#EF4444',
@@ -92,6 +93,7 @@ export default function DashboardPage() {
   const districtsByMwh = [...DISTRICTS].sort((a, b) => b.mwh - a.mwh);
 
   return (
+    <NoDataGate>
     <div style={{ padding: '28px 24px 60px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
@@ -490,5 +492,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </NoDataGate>
   );
 }

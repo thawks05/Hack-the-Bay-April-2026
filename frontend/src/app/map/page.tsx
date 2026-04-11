@@ -3,6 +3,7 @@
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { DISTRICTS, District } from '@/lib/districts';
+import NoDataGate from '@/components/NoDataGate';
 
 const MapClient = dynamic(() => import('@/components/MapClient'), { ssr: false });
 
@@ -46,6 +47,7 @@ export default function MapPage() {
   };
 
   return (
+    <NoDataGate>
     <div style={{ display: 'flex', height: 'calc(100vh - 52px)', overflow: 'hidden' }}>
       {/* Sidebar */}
       <div
@@ -307,5 +309,6 @@ export default function MapPage() {
         />
       </div>
     </div>
+    </NoDataGate>
   );
 }

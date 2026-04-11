@@ -5,7 +5,7 @@ Run: uvicorn main:app --reload
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
@@ -31,15 +31,8 @@ app.add_middleware(
 
 app.include_router(upload_router, prefix="/api")
 
-# Serve mock CSV files so the browser's "Load Mock Tampa Data" button can fetch them
+# Serve mock CSV files (used for testing)
 app.mount("/data", StaticFiles(directory="data"), name="data")
-
-# Serve the UI
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-@app.get("/")
-def serve_ui():
-    return FileResponse("static/index.html")
 
 
 # ---------------------------------------------------------------------------
@@ -146,6 +139,58 @@ def get_roadmap(req: RoadmapRequest):
     """
     summaries = get_session_summaries()
     return build_roadmap(req.horizons, summaries)
+
+
+# ---------------------------------------------------------------------------
+# Districts — live data in the shape Jose's frontend expects
+# ---------------------------------------------------------------------------
+
+@app.get("/api/districts")
+def get_districts():
+    """
+    Return zone stats shaped as District objects for the Next.js frontend.
+    Falls back to empty list if no CSVs uploaded yet (frontend uses static data then).
+    """
+    dfs = get_uploaded_dataframes()
+    if not dfs:
+        return {"districts": []}
+
+    import pandas as pd
+    combined = pd.concat(dfs, ignore_index=True)
+
+    districts = []
+    if "zone_id" in combined.columns:
+        for zone_id, grp in combined.groupby("zone_id"):
+            pct  = grp["allocation_pct"] if "allocation_pct" in combined.columns else 1.0
+            gen  = float((grp["generation_mw"]  * pct).sum()) if "generation_mw"  in grp.columns else 0.0
+            cons = float((grp["consumption_mw"] * pct).sum()) if "consumption_mw" in grp.columns else 0.0
+            cap  = float(grp["capacity_mw"].sum())             if "capacity_mw"    in grp.columns else 0.0
+            net  = gen - cons
+            renewable_gen = float(
+                (grp.loc[grp["source_type"].str.lower().isin(["solar","wind","hydro"]), "generation_mw"] * pct).sum()
+            ) if "source_type" in grp.columns else 0.0
+            renewable_pct = round((renewable_gen / gen * 100) if gen > 0 else 0, 1)
+            waste_pct     = round(((cap - cons) / cap * 100) if cap > 0 else 0, 1)
+
+            if net > 20:
+                status = "green"
+            elif net > -20:
+                status = "amber"
+            else:
+                status = "red"
+
+            districts.append({
+                "id":        str(zone_id).lower().replace(" ", "_"),
+                "name":      str(zone_id),
+                "mwh":       round(cons, 1),
+                "waste":     max(0.0, waste_pct),
+                "renewable": renewable_pct,
+                "peak":      "—",
+                "status":    status,
+                # coords omitted — frontend falls back to its static polygons for the map shape
+            })
+
+    return {"districts": districts}
 
 
 # ---------------------------------------------------------------------------

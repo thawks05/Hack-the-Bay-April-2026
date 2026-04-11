@@ -11,6 +11,7 @@ import {
   ReferenceLine,
   ResponsiveContainer,
 } from 'recharts';
+import NoDataGate from '@/components/NoDataGate';
 
 interface Milestone {
   year: number;
@@ -158,6 +159,7 @@ export default function RoadmapPage() {
   const nextMilestone = futureMilestones[0];
 
   return (
+    <NoDataGate>
     <div style={{ padding: '28px 24px 60px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
@@ -549,5 +551,6 @@ export default function RoadmapPage() {
         </div>
       </div>
     </div>
+    </NoDataGate>
   );
 }

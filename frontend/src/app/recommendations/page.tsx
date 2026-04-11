@@ -10,6 +10,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { PROJECTS, DISTRICTS, Project } from '@/lib/districts';
+import NoDataGate from '@/components/NoDataGate';
 
 type SortKey = 'score' | 'costScore' | 'speed' | 'efficiency';
 type FilterType = 'all' | 'solar' | 'efficiency' | 'wind' | 'storage' | 'grid';
@@ -112,6 +113,7 @@ export default function RecommendationsPage() {
     DISTRICTS.find((d) => d.id === id)?.name ?? id;
 
   return (
+    <NoDataGate>
     <div style={{ padding: '28px 24px 60px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: '24px' }}>
@@ -406,5 +408,6 @@ export default function RecommendationsPage() {
         })}
       </div>
     </div>
+    </NoDataGate>
   );
 }

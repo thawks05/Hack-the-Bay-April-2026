@@ -22,6 +22,18 @@ from typing import Optional
 from backend.processor import parse_and_clean
 from backend.config import UPLOAD_DIR
 
+
+def _safe(v):
+    """Convert numpy/pandas scalars to native Python types for JSON serialization."""
+    import numpy as np
+    if isinstance(v, (np.integer,)):
+        return int(v)
+    if isinstance(v, (np.floating,)):
+        return float(v)
+    if isinstance(v, (np.ndarray,)):
+        return v.tolist()
+    return v
+
 router = APIRouter()
 
 # In-memory store of summaries for this session
@@ -33,16 +45,27 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 @router.post("/upload")
 async def upload_files(
-    files: list[UploadFile] = File(...),
-    file_type: Optional[str] = Form(None),  # "utility" | "timeseries" | "event"
+    files: Optional[list[UploadFile]] = File(None),   # Timothy's test UI (plural)
+    file:  Optional[UploadFile]       = File(None),   # Jose's frontend (singular)
+    file_type: Optional[str] = Form(None),
 ):
     """
     Upload one or more CSVs. `file_type` applies to all files in this batch.
     If omitted, type is auto-detected from column names.
     """
+    # Normalise: accept either `file` (singular from Next.js) or `files` (plural from test UI)
+    all_uploads: list[UploadFile] = []
+    if files:
+        all_uploads.extend(files)
+    if file:
+        all_uploads.append(file)
+
+    if not all_uploads:
+        return JSONResponse({"uploads": [], "error": "No files received"})
+
     results = []
 
-    for upload in files:
+    for upload in all_uploads:
         raw = await upload.read()
 
         try:
@@ -57,7 +80,7 @@ async def upload_files(
             f.write(raw)
 
         # Store summary (without the dataframe — not serialisable)
-        summary = {k: v for k, v in parsed["summary"].items()}
+        summary = {k: _safe(v) for k, v in parsed["summary"].items()}
         _session_summaries[upload.filename] = summary
 
         results.append(

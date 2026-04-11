@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { backendStatus } from '@/lib/api';
+import { backendStatus, fetchUploads } from '@/lib/api';
 
 const NAV_LINKS = [
   { href: '/', label: 'Home' },
@@ -12,15 +12,21 @@ const NAV_LINKS = [
   { href: '/recommendations', label: 'Recommendations' },
   { href: '/roadmap', label: 'Roadmap' },
   { href: '/chat', label: 'Chat' },
+  { href: '/onboarding', label: 'Data Onboarding' },
 ];
 
 export default function Navbar() {
   const pathname = usePathname();
   const [apiOnline, setApiOnline] = useState<boolean | null>(null);
+  const [uploadCount, setUploadCount] = useState<number | null>(null);
 
   useEffect(() => {
     backendStatus().then(setApiOnline);
-    const interval = setInterval(() => backendStatus().then(setApiOnline), 15000);
+    fetchUploads().then((u) => setUploadCount(Object.keys(u).length));
+    const interval = setInterval(() => {
+      backendStatus().then(setApiOnline);
+      fetchUploads().then((u) => setUploadCount(Object.keys(u).length));
+    }, 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -168,21 +174,32 @@ export default function Navbar() {
           </span>
         )}
         {/* Data loaded pill */}
-        <span
-          style={{
-            fontSize: '11px',
-            fontWeight: 500,
-            color: '#14B8A6',
-            backgroundColor: 'rgba(20,184,166,0.12)',
-            border: '1px solid rgba(20,184,166,0.25)',
-            padding: '2px 8px',
-            borderRadius: '20px',
-            whiteSpace: 'nowrap',
-            letterSpacing: '0.01em',
-          }}
-        >
-          Downtown Tampa · Data Loaded
-        </span>
+        {uploadCount !== null && (
+          <Link
+            href="/onboarding"
+            style={{ textDecoration: 'none' }}
+            title={uploadCount > 0 ? `${uploadCount} file${uploadCount !== 1 ? 's' : ''} loaded` : 'No data loaded — click to upload'}
+          >
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 500,
+                color: uploadCount > 0 ? '#14B8A6' : '#F59E0B',
+                backgroundColor: uploadCount > 0 ? 'rgba(20,184,166,0.12)' : 'rgba(245,158,11,0.1)',
+                border: `1px solid ${uploadCount > 0 ? 'rgba(20,184,166,0.25)' : 'rgba(245,158,11,0.25)'}`,
+                padding: '2px 8px',
+                borderRadius: '20px',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.01em',
+                cursor: 'pointer',
+              }}
+            >
+              {uploadCount > 0
+                ? `${uploadCount} file${uploadCount !== 1 ? 's' : ''} loaded`
+                : 'No data — Upload'}
+            </span>
+          </Link>
+        )}
       </div>
     </nav>
   );
