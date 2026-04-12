@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Polygon, Tooltip, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polygon, Tooltip, Marker, useMap } from 'react-leaflet';
+import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { DISTRICTS, District } from '@/lib/districts';
 import { fetchMapData } from '@/lib/api';
@@ -86,14 +87,27 @@ function MapFitter({ districts }: { districts: District[] }) {
   return null;
 }
 
-const PIN_COLOR: Record<string, string> = {
-  solar: '#F59E0B',
-  wind: '#3B82F6',
-  storage: '#A78BFA',
-  generator: '#EF4444',
-  substation: '#6B7280',
-  consumer: '#14B8A6',
-};
+function substationIcon() {
+  return L.divIcon({
+    className: '',
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
+    html: `<svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
+      <polygon points="9,2 16,15 2,15" fill="#F59E0B" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    </svg>`,
+  });
+}
+
+function generatorIcon() {
+  return L.divIcon({
+    className: '',
+    iconSize: [16, 16],
+    iconAnchor: [8, 8],
+    html: `<svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg">
+      <rect x="2" y="2" width="12" height="12" fill="#3B82F6" stroke="#fff" stroke-width="1.5" rx="1"/>
+    </svg>`,
+  });
+}
 
 export default function MapClient({ selectedId, onSelect, activeLayer, districts: propDistricts }: Props) {
   const [isMounted, setIsMounted] = useState(false);
@@ -104,7 +118,13 @@ export default function MapClient({ selectedId, onSelect, activeLayer, districts
     setIsMounted(true);
     fetchMapData().then((geo) => {
       const facilityPins: FacilityPin[] = (geo.features as unknown[])
-        .filter((f: unknown) => (f as { geometry?: { type?: string } }).geometry?.type === 'Point')
+        .filter((f: unknown) => {
+          const feat = f as { geometry?: { type?: string }; properties?: { source_type?: string } };
+          return feat.geometry?.type === 'Point' &&
+            ['substation', 'generator', 'solar', 'wind', 'storage'].includes(
+              feat.properties?.source_type ?? ''
+            );
+        })
         .map((f: unknown) => {
           const feat = f as { geometry: { coordinates: number[] }; properties: Record<string, unknown> };
           return {
@@ -212,30 +232,23 @@ export default function MapClient({ selectedId, onSelect, activeLayer, districts
         );
       })}
 
-      {/* Facility pins from uploaded CSV */}
+      {/* Facility markers: triangle = substation, square = generator/solar/wind/storage */}
       {pins.map((pin, i) => (
-        <CircleMarker
+        <Marker
           key={i}
-          center={[pin.lat, pin.lon]}
-          radius={6}
-          pathOptions={{
-            color: PIN_COLOR[pin.source_type] ?? '#9CA3AF',
-            fillColor: PIN_COLOR[pin.source_type] ?? '#9CA3AF',
-            fillOpacity: 0.85,
-            weight: 1.5,
-          }}
+          position={[pin.lat, pin.lon]}
+          icon={pin.source_type === 'substation' ? substationIcon() : generatorIcon()}
         >
           <Tooltip direction="top" sticky>
             <div style={{ fontFamily: 'Inter, sans-serif', minWidth: '160px' }}>
               <div style={{ fontWeight: 700, fontSize: '12px', marginBottom: '4px' }}>{pin.name}</div>
               <div style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1.6 }}>
-                Type: {pin.source_type}<br />
+                {pin.source_type}<br />
                 {pin.generation_mw > 0 && <>Gen: {pin.generation_mw} MW<br /></>}
-                {pin.consumption_mw > 0 && <>Cons: {pin.consumption_mw} MW<br /></>}
               </div>
             </div>
           </Tooltip>
-        </CircleMarker>
+        </Marker>
       ))}
     </MapContainer>
   );

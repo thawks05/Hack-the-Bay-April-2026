@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   RadarChart,
   Radar,
@@ -9,8 +9,16 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
-import { PROJECTS, DISTRICTS, Project } from '@/lib/districts';
+import { PROJECTS as STATIC_PROJECTS } from '@/lib/districts';
+import { fetchRecommendations, ScoredProject } from '@/lib/api';
 import NoDataGate from '@/components/NoDataGate';
+
+type Project = ScoredProject & {
+  efficiency: number;
+  costScore: number;
+  speed: number;
+  time?: string;
+};
 
 type SortKey = 'score' | 'costScore' | 'speed' | 'efficiency';
 type FilterType = 'all' | 'solar' | 'efficiency' | 'wind' | 'storage' | 'grid';
@@ -99,30 +107,50 @@ export default function RecommendationsPage() {
   const [sortKey, setSortKey] = useState<SortKey>('score');
   const [filterType, setFilterType] = useState<FilterType>('all');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>(STATIC_PROJECTS as unknown as Project[]);
+  const [source, setSource] = useState<'mock' | 'gemma' | 'loading'>('loading');
+  const [aiInsight, setAiInsight] = useState<string>('');
 
-  const filtered = PROJECTS
+  useEffect(() => {
+    fetchRecommendations().then(({ projects: data, source: src, ai_insight }) => {
+      setProjects(data as unknown as Project[]);
+      setSource(src);
+      setAiInsight(ai_insight);
+    });
+  }, []);
+
+  const filtered = projects
     .filter((p) => filterType === 'all' || p.type === filterType)
-    .sort((a, b) => b[sortKey] - a[sortKey]);
+    .sort((a, b) => (b[sortKey] as number) - (a[sortKey] as number));
 
-  const totalCost = PROJECTS.reduce((acc, p) => {
-    const match = p.cost.match(/\$([\d.]+)M/);
+  const totalCost = projects.reduce((acc, p) => {
+    const match = String(p.cost ?? '').match(/\$([\d.]+)M/);
     return acc + (match ? parseFloat(match[1]) : 0);
   }, 0);
 
-  const getDistrictName = (id: string) =>
-    DISTRICTS.find((d) => d.id === id)?.name ?? id;
+  const getDistrictName = (id: string) => id;
 
   return (
     <NoDataGate>
     <div style={{ padding: '28px 24px 60px', maxWidth: '1200px', margin: '0 auto' }}>
       {/* Header */}
-      <div style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.02em', color: '#F9FAFB' }}>
-          Optimization Recommendations
-        </h1>
-        <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
-          AI-scored projects ranked by impact, cost efficiency, and implementation speed
-        </p>
+      <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: 800, margin: '0 0 4px', letterSpacing: '-0.02em', color: '#F9FAFB' }}>
+            Optimization Recommendations
+          </h1>
+          <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
+            AI-scored projects ranked by impact, cost efficiency, and implementation speed
+          </p>
+        </div>
+        <span style={{
+          fontSize: '11px', fontWeight: 600, padding: '4px 12px', borderRadius: '20px',
+          backgroundColor: source === 'gemma' ? 'rgba(20,184,166,0.1)' : source === 'loading' ? 'rgba(107,114,128,0.1)' : 'rgba(245,158,11,0.1)',
+          border: `1px solid ${source === 'gemma' ? 'rgba(20,184,166,0.3)' : source === 'loading' ? 'rgba(107,114,128,0.3)' : 'rgba(245,158,11,0.3)'}`,
+          color: source === 'gemma' ? '#14B8A6' : source === 'loading' ? '#9CA3AF' : '#F59E0B',
+        }}>
+          {source === 'gemma' ? 'Gemma 4 · generated from your data' : source === 'loading' ? 'Loading…' : 'Sample data'}
+        </span>
       </div>
 
       {/* Summary cards */}
@@ -135,10 +163,10 @@ export default function RecommendationsPage() {
         }}
       >
         {[
-          { label: 'Total Projects', value: PROJECTS.length, unit: '', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
+          { label: 'Total Projects', value: projects.length, unit: '', color: '#3B82F6', bg: 'rgba(59,130,246,0.08)', border: 'rgba(59,130,246,0.2)' },
           { label: 'Total Investment', value: `$${totalCost.toFixed(1)}M`, unit: '', color: '#F59E0B', bg: 'rgba(245,158,11,0.08)', border: 'rgba(245,158,11,0.2)' },
-          { label: 'Avg Score', value: Math.round(PROJECTS.reduce((a, p) => a + p.score, 0) / PROJECTS.length), unit: '/100', color: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)' },
-          { label: 'Top Score', value: Math.max(...PROJECTS.map((p) => p.score)), unit: '/100', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)' },
+          { label: 'Avg Score', value: projects.length ? Math.round(projects.reduce((a, p) => a + p.score, 0) / projects.length) : 0, unit: '/100', color: '#14B8A6', bg: 'rgba(20,184,166,0.08)', border: 'rgba(20,184,166,0.2)' },
+          { label: 'Top Score', value: projects.length ? Math.max(...projects.map((p) => p.score)) : 0, unit: '/100', color: '#A78BFA', bg: 'rgba(167,139,250,0.08)', border: 'rgba(167,139,250,0.2)' },
         ].map((card) => (
           <div
             key={card.label}
@@ -159,6 +187,38 @@ export default function RecommendationsPage() {
           </div>
         ))}
       </div>
+
+      {/* Gemma AI insight banner */}
+      {aiInsight && (
+        <div style={{
+          backgroundColor: 'rgba(20,184,166,0.06)',
+          border: '1px solid rgba(20,184,166,0.2)',
+          borderRadius: '12px',
+          padding: '14px 18px',
+          marginBottom: '20px',
+          display: 'flex',
+          gap: '12px',
+          alignItems: 'flex-start',
+        }}>
+          <div style={{
+            width: '28px', height: '28px', borderRadius: '8px', flexShrink: 0,
+            backgroundColor: 'rgba(20,184,166,0.15)', border: '1px solid rgba(20,184,166,0.3)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+              <path d="M13 2L3 14H12L11 22L21 10H12L13 2Z" fill="#14B8A6" />
+            </svg>
+          </div>
+          <div>
+            <div style={{ fontSize: '10px', fontWeight: 700, color: '#14B8A6', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: '5px' }}>
+              Gemma 4 Analysis · from your uploaded data
+            </div>
+            <p style={{ fontSize: '12.5px', color: '#D1D5DB', lineHeight: 1.65, margin: 0 }}>
+              {aiInsight}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Filters & sort */}
       <div

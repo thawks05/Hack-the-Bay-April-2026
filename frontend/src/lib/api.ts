@@ -96,12 +96,16 @@ export async function sendChat(
 
 // ── Recommendations (scored by Timothy's backend) ────────────────────────────
 
-export async function fetchRecommendations(): Promise<ScoredProject[]> {
-  const data = await apiFetch<{ projects: ScoredProject[] }>(
+export async function fetchRecommendations(): Promise<{ projects: ScoredProject[]; source: 'gemma' | 'mock'; ai_insight: string }> {
+  const data = await apiFetch<{ projects: ScoredProject[]; source?: string; ai_insight?: string }>(
     '/api/recommendations',
-    { projects: STATIC_PROJECTS as unknown as ScoredProject[] }
+    { projects: STATIC_PROJECTS as unknown as ScoredProject[], source: 'mock', ai_insight: '' }
   );
-  return data.projects ?? [];
+  return {
+    projects: data.projects ?? [],
+    source: data.source === 'gemma' ? 'gemma' : 'mock',
+    ai_insight: data.ai_insight ?? '',
+  };
 }
 
 // ── Map data (GeoJSON from uploaded CSVs) ───────────────────────────────────

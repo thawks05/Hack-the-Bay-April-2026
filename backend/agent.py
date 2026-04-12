@@ -128,6 +128,37 @@ def ask_agent(query: str, grid_summary: dict | None = None) -> dict:
     }
 
 
+def generate_ai_insight(grid_summary: dict | None = None) -> str:
+    """
+    Ask Gemma for a short free-text analysis of what the uploaded data reveals
+    and which energy priorities stand out. Returns plain text (no JSON required).
+    Falls back to empty string on error.
+    """
+    context = build_context_block(grid_summary)
+    if not context.strip():
+        return ""
+
+    prompt = (
+        f"{context}\n"
+        "In 3-4 sentences, summarize what this energy data reveals about the city's biggest "
+        "inefficiencies and which type of project (solar, storage, grid efficiency, etc.) "
+        "should be the top priority and why. Be specific about zones and MW figures."
+    )
+
+    try:
+        result = ollama.chat(
+            model=OLLAMA_MODEL,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+            ],
+        )
+        return result["message"]["content"].strip()
+    except Exception as e:
+        print(f"[Agent] generate_ai_insight error: {e}")
+    return ""
+
+
 def build_roadmap(horizon_years: list[int], grid_summary: dict | None = None) -> dict:
     """
     Ask the agent to produce a phased roadmap for the given year horizons.

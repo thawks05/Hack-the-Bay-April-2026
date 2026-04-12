@@ -17,7 +17,7 @@ from backend.zones import (
     load_zones_geojson, load_config, list_zone_names,
     ingest_zones_geojson, reset_to_default
 )
-from backend.agent import ask_agent, build_roadmap
+from backend.agent import ask_agent, build_roadmap, generate_ai_insight
 from backend.scoring import score_projects
 
 app = FastAPI(title="Tampa PowerIQ", version="0.1.0")
@@ -119,8 +119,20 @@ def chat(req: ChatRequest):
 
 @app.get("/api/recommendations")
 def get_recommendations():
-    """Return all projects scored and ranked."""
-    return {"projects": score_projects()}
+    """
+    Return scored projects + an AI insight paragraph from Gemma when CSV data is uploaded.
+    Projects are always scored from the mock database; Gemma adds the analysis narrative.
+    """
+    dfs = get_uploaded_dataframes()
+    if dfs:
+        summaries = get_session_summaries()
+        insight = generate_ai_insight(summaries)
+        return {
+            "projects": score_projects(),
+            "source": "gemma",
+            "ai_insight": insight,
+        }
+    return {"projects": score_projects(), "source": "mock", "ai_insight": ""}
 
 
 # ---------------------------------------------------------------------------
