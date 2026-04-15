@@ -1,7 +1,8 @@
 # Hack the Bay April 2026
 # Officially scored #2 for Best Overall Projects, and won the best Smart City Project
 
-Hackathon project for Hack the Bay, April 2026.
+Hackathon project for Hack the Bay, April 2026. 
+All of the code you see was shipped in <6 hours.
 
 ## Setup
 
